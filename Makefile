@@ -54,7 +54,7 @@ docker-logs:
 	docker-compose logs -f
 
 # マイグレーション関連
-MIGRATE_CMD=migrate -path db/migrations -database "postgres://postgres:postgres@localhost:5432/ticket_reservation?sslmode=disable"
+MIGRATE_CMD=migrate -path db/migrations -database "postgres://postgres:postgres@localhost:5433/ticket_reservation?sslmode=disable"
 
 migrate-up:
 	@echo "==> マイグレーションを適用しています..."
