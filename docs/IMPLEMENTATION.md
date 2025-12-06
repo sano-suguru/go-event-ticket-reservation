@@ -717,16 +717,23 @@ flowchart LR
     
     subgraph CI パイプライン
         Lint[Lint<br/>コード品質チェック]
+        Security[Security<br/>脆弱性スキャン]
         Test[Test<br/>単体・統合テスト]
         Build[Build<br/>ビルド確認]
     end
     
     Push --> Lint
+    Push --> Security
+    Push --> Test
     PR --> Lint
-    Lint --> Test
+    PR --> Security
+    PR --> Test
+    Lint --> Build
+    Security --> Build
     Test --> Build
     
     style Lint fill:#fff3e0
+    style Security fill:#ffebee
     style Test fill:#e3f2fd
     style Build fill:#e8f5e9
 ```
@@ -752,6 +759,13 @@ jobs:
         with:
           args: --timeout=5m
 
+  security:
+    # govulncheck で依存パッケージの脆弱性をチェック
+    steps:
+      - run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
   test:
     # PostgreSQL と Redis をサービスコンテナとして起動
     services:
@@ -763,8 +777,8 @@ jobs:
       - run: go test -v -race -coverprofile=coverage.out ./...
 
   build:
-    # lint と test が成功した場合のみ実行
-    needs: [lint, test]
+    # lint, security, test が成功した場合のみ実行
+    needs: [lint, security, test]
     steps:
       - run: go build -v ./cmd/api
 ```
@@ -774,6 +788,7 @@ jobs:
 | ジョブ | 内容 | 失敗時 |
 |-------|------|--------|
 | **Lint** | コードスタイル、潜在的バグ検出 | PR をマージ不可 |
+| **Security** | 依存パッケージの脆弱性チェック | PR をマージ不可 |
 | **Test** | 全テスト実行（DB/Redis 使用） | PR をマージ不可 |
 | **Build** | バイナリがビルドできるか確認 | PR をマージ不可 |
 

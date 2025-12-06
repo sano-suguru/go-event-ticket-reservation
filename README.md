@@ -71,7 +71,7 @@ flowchart TB
 
 | 役割 | 技術 |
 |------|------|
-| 言語 | Go 1.23 |
+| 言語 | Go 1.24 |
 | Web | Echo v4 |
 | DB | PostgreSQL 16 |
 | キャッシュ / ロック | Redis 7 |
