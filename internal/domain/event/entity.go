@@ -45,3 +45,19 @@ func (e *Event) Validate() error {
 	}
 	return nil
 }
+
+// IsBookingOpen は予約受付中かを返す
+func (e *Event) IsBookingOpen() bool {
+	now := time.Now()
+	return now.Before(e.StartAt)
+}
+
+// HasStarted はイベントが開始済みかを返す
+func (e *Event) HasStarted() bool {
+	return time.Now().After(e.StartAt)
+}
+
+// HasEnded はイベントが終了済みかを返す
+func (e *Event) HasEnded() bool {
+	return time.Now().After(e.EndAt)
+}

@@ -31,7 +31,7 @@ CREATE TABLE seats (
 CREATE TABLE reservations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     event_id UUID NOT NULL REFERENCES events(id),
-    user_id UUID NOT NULL,
+    user_id VARCHAR(255) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'pending',
     idempotency_key VARCHAR(255) UNIQUE,
     expires_at TIMESTAMP NOT NULL,
