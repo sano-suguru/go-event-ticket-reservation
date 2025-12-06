@@ -4,11 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
+	"strings"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/domain/event"
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/domain/reservation"
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/domain/seat"
+	redislock "github.com/sanosuguru/go-event-ticket-reservation/internal/infrastructure/redis"
 )
 
 type ReservationService struct {
@@ -16,10 +20,11 @@ type ReservationService struct {
 	reservationRepo reservation.Repository
 	seatRepo        seat.Repository
 	eventRepo       event.Repository
+	lockManager     *redislock.LockManager
 }
 
-func NewReservationService(db *sqlx.DB, rr reservation.Repository, sr seat.Repository, er event.Repository) *ReservationService {
-	return &ReservationService{db: db, reservationRepo: rr, seatRepo: sr, eventRepo: er}
+func NewReservationService(db *sqlx.DB, rr reservation.Repository, sr seat.Repository, er event.Repository, lm *redislock.LockManager) *ReservationService {
+	return &ReservationService{db: db, reservationRepo: rr, seatRepo: sr, eventRepo: er, lockManager: lm}
 }
 
 type CreateReservationInput struct {
@@ -30,6 +35,7 @@ type CreateReservationInput struct {
 }
 
 func (s *ReservationService) CreateReservation(ctx context.Context, input CreateReservationInput) (*reservation.Reservation, error) {
+	// 冪等性チェック
 	existing, err := s.reservationRepo.GetByIdempotencyKey(ctx, input.IdempotencyKey)
 	if err == nil {
 		return existing, nil
@@ -37,6 +43,22 @@ func (s *ReservationService) CreateReservation(ctx context.Context, input Create
 	if !errors.Is(err, reservation.ErrReservationNotFound) {
 		return nil, fmt.Errorf("冪等性チェックに失敗: %w", err)
 	}
+
+	// 分散ロックを取得（座席IDをソートしてデッドロックを防止）
+	lockKey := s.buildSeatLockKey(input.SeatIDs)
+	var lock *redislock.DistributedLock
+	if s.lockManager != nil {
+		lock, err = s.lockManager.AcquireLockWithRetry(ctx, lockKey, 10*time.Second, 3, 100*time.Millisecond)
+		if err != nil {
+			if errors.Is(err, redislock.ErrLockNotAcquired) {
+				return nil, fmt.Errorf("座席が他のユーザーによって処理中です")
+			}
+			return nil, fmt.Errorf("ロック取得に失敗: %w", err)
+		}
+		defer lock.Release(ctx)
+	}
+
+	// イベント確認
 	ev, err := s.eventRepo.GetByID(ctx, input.EventID)
 	if err != nil {
 		return nil, fmt.Errorf("イベント取得に失敗: %w", err)
@@ -44,6 +66,8 @@ func (s *ReservationService) CreateReservation(ctx context.Context, input Create
 	if !ev.IsBookingOpen() {
 		return nil, event.ErrEventNotOpen
 	}
+
+	// 座席確認
 	seats, err := s.seatRepo.GetByEventID(ctx, input.EventID)
 	if err != nil {
 		return nil, fmt.Errorf("座席取得に失敗: %w", err)
@@ -63,20 +87,23 @@ func (s *ReservationService) CreateReservation(ctx context.Context, input Create
 		}
 		totalAmount += se.Price
 	}
+
+	// 予約作成
 	res := reservation.NewReservation(input.EventID, input.UserID, input.IdempotencyKey, input.SeatIDs, totalAmount)
 	if err := res.Validate(); err != nil {
 		return nil, err
 	}
+
+	// トランザクション
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("トランザクション開始に失敗: %w", err)
 	}
 	defer tx.Rollback()
-	// 先に予約を作成してIDを取得
+
 	if err := s.reservationRepo.Create(ctx, tx, res); err != nil {
 		return nil, err
 	}
-	// 座席を予約状態に更新
 	if err := s.seatRepo.ReserveSeats(ctx, tx, input.SeatIDs, res.ID); err != nil {
 		return nil, err
 	}
@@ -84,6 +111,14 @@ func (s *ReservationService) CreateReservation(ctx context.Context, input Create
 		return nil, fmt.Errorf("コミットに失敗: %w", err)
 	}
 	return res, nil
+}
+
+// buildSeatLockKey は座席IDからロックキーを生成（ソートしてデッドロック防止）
+func (s *ReservationService) buildSeatLockKey(seatIDs []string) string {
+	sorted := make([]string, len(seatIDs))
+	copy(sorted, seatIDs)
+	sort.Strings(sorted)
+	return "seats:" + strings.Join(sorted, ",")
 }
 
 func (s *ReservationService) GetReservation(ctx context.Context, id string) (*reservation.Reservation, error) {

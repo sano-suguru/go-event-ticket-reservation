@@ -16,6 +16,7 @@ import (
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/application"
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/config"
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/infrastructure/postgres"
+	redisinfra "github.com/sanosuguru/go-event-ticket-reservation/internal/infrastructure/redis"
 )
 
 func main() {
@@ -27,6 +28,22 @@ func main() {
 	}
 	defer db.Close()
 
+	// Redis接続
+	redisClient, err := redisinfra.NewClient(&redisinfra.Config{
+		Host:     cfg.Redis.Host,
+		Port:     cfg.Redis.Port,
+		Password: cfg.Redis.Password,
+		DB:       cfg.Redis.DB,
+	})
+	if err != nil {
+		log.Printf("Redis接続エラー（分散ロック無効）: %v", err)
+	}
+	var lockManager *redisinfra.LockManager
+	if redisClient != nil {
+		lockManager = redisinfra.NewLockManager(redisClient)
+		defer redisClient.Close()
+	}
+
 	// Repositories
 	eventRepo := postgres.NewEventRepository(db)
 	seatRepo := postgres.NewSeatRepository(db)
@@ -35,7 +52,7 @@ func main() {
 	// Services
 	eventService := application.NewEventService(eventRepo)
 	seatService := application.NewSeatService(db, seatRepo, eventRepo)
-	reservationService := application.NewReservationService(db, reservationRepo, seatRepo, eventRepo)
+	reservationService := application.NewReservationService(db, reservationRepo, seatRepo, eventRepo, lockManager)
 
 	// Handlers
 	eventHandler := handler.NewEventHandler(eventService)

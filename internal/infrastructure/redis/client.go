@@ -5,23 +5,23 @@ import (
 	"fmt"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/sanosuguru/go-event-ticket-reservation/internal/config"
 )
 
-// NewClient はRedisクライアントを作成する
-func NewClient(cfg *config.RedisConfig) *redis.Client {
-	return redis.NewClient(&redis.Options{
-		Addr:     cfg.Addr(),
+type Config struct {
+	Host     string
+	Port     string
+	Password string
+	DB       int
+}
+
+func NewClient(cfg *Config) (*redis.Client, error) {
+	client := redis.NewClient(&redis.Options{
+		Addr:     fmt.Sprintf("%s:%s", cfg.Host, cfg.Port),
 		Password: cfg.Password,
 		DB:       cfg.DB,
 	})
-}
-
-// Ping はRedis接続を確認する
-func Ping(ctx context.Context, client *redis.Client) error {
-	_, err := client.Ping(ctx).Result()
-	if err != nil {
-		return fmt.Errorf("Redis接続に失敗しました: %w", err)
+	if err := client.Ping(context.Background()).Err(); err != nil {
+		return nil, fmt.Errorf("Redis接続に失敗: %w", err)
 	}
-	return nil
+	return client, nil
 }
