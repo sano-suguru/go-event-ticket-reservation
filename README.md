@@ -1,5 +1,9 @@
 # Event Ticket Reservation System
 
+[![CI](https://github.com/sano-suguru/go-event-ticket-reservation/actions/workflows/ci.yml/badge.svg)](https://github.com/sano-suguru/go-event-ticket-reservation/actions/workflows/ci.yml)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/sano-suguru/go-event-ticket-reservation)](https://go.dev/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 高並行性イベントチケット予約システムのバックエンド API
 
 **「同じ座席を2人に販売しない」** を確実に実現します。
