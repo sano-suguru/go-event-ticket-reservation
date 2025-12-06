@@ -3,6 +3,7 @@
 [![CI](https://github.com/sano-suguru/go-event-ticket-reservation/actions/workflows/ci.yml/badge.svg)](https://github.com/sano-suguru/go-event-ticket-reservation/actions/workflows/ci.yml)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/sano-suguru/go-event-ticket-reservation)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Demo](https://img.shields.io/badge/demo-Railway-blueviolet)](https://go-event-ticket-reservation-production.up.railway.app/swagger/index.html)
 
 高並行性イベントチケット予約システムのバックエンド API
 
@@ -191,6 +192,20 @@ stateDiagram-v2
 
 ---
 
+## 🌐 デモ環境
+
+本番デプロイ済みの API にアクセスできます：
+
+| リソース | URL |
+|----------|-----|
+| **Swagger UI** | https://go-event-ticket-reservation-production.up.railway.app/swagger/index.html |
+| ヘルスチェック | https://go-event-ticket-reservation-production.up.railway.app/health |
+| Prometheus メトリクス | https://go-event-ticket-reservation-production.up.railway.app/metrics |
+
+> **Note**: Railway の無料プランではアイドル時にスリープするため、初回アクセス時に数秒かかる場合があります。
+
+---
+
 ## クイックスタート
 
 ```bash
@@ -205,6 +220,7 @@ make run
 
 # 4. Swagger UI
 open http://localhost:8080/swagger/index.html
+# または本番環境: https://go-event-ticket-reservation-production.up.railway.app/swagger/index.html
 ```
 
 ---
