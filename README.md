@@ -235,7 +235,7 @@ open http://localhost:8080/swagger/index.html
 | 予約確定 | POST | `/api/v1/reservations/:id/confirm` |
 | 予約キャンセル | POST | `/api/v1/reservations/:id/cancel` |
 
-詳細は [Swagger UI](http://localhost:8080/swagger/index.html) を参照。
+詳細は [Swagger UI](https://go-event-ticket-reservation-production.up.railway.app/swagger/index.html) を参照。
 
 ---
 
