@@ -115,7 +115,6 @@ definitions:
         example: user-123
         type: string
     type: object
-host: localhost:8081
 info:
   contact:
     email: support@example.com
