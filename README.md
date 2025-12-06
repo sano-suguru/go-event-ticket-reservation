@@ -274,7 +274,16 @@ if err == nil {
 
 ## 詳細ドキュメント
 
-- [技術解説 (IMPLEMENTATION.md)](docs/IMPLEMENTATION.md) - 設計思想と実装詳細
+📖 **[技術解説 (IMPLEMENTATION.md)](docs/IMPLEMENTATION.md)**
+
+README では触れていない以下の内容を詳しく解説しています：
+
+- **構造化ログ** - zap による JSON ログ出力と監視連携
+- **Prometheus メトリクス** - カスタムメトリクスの定義と収集
+- **Redis キャッシュ戦略** - 空席数のキャッシュと無効化タイミング
+- **バックグラウンドワーカー** - 期限切れ予約の自動キャンセル処理
+- **CI/CD パイプライン** - GitHub Actions の設定詳細
+- **Swagger/OpenAPI** - API ドキュメントの自動生成
 
 ---
 
