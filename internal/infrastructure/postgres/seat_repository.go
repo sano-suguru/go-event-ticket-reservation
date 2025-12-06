@@ -9,6 +9,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
+
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/domain/seat"
 )
 

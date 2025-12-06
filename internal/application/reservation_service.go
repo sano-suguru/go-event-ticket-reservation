@@ -25,10 +25,11 @@ type ReservationService struct {
 	seatRepo        seat.Repository
 	eventRepo       event.Repository
 	lockManager     *redislock.LockManager
+	seatCache       *redislock.SeatCache
 }
 
-func NewReservationService(db *sqlx.DB, rr reservation.Repository, sr seat.Repository, er event.Repository, lm *redislock.LockManager) *ReservationService {
-	return &ReservationService{db: db, reservationRepo: rr, seatRepo: sr, eventRepo: er, lockManager: lm}
+func NewReservationService(db *sqlx.DB, rr reservation.Repository, sr seat.Repository, er event.Repository, lm *redislock.LockManager, cache *redislock.SeatCache) *ReservationService {
+	return &ReservationService{db: db, reservationRepo: rr, seatRepo: sr, eventRepo: er, lockManager: lm, seatCache: cache}
 }
 
 type CreateReservationInput struct {
@@ -82,7 +83,7 @@ func (s *ReservationService) CreateReservation(ctx context.Context, input Create
 		}
 		defer func() {
 			releaseStart := time.Now()
-			lock.Release(ctx)
+			_ = lock.Release(ctx)
 			if m := metrics.Get(); m != nil {
 				m.DistributedLockDuration.WithLabelValues("release", "success").Observe(time.Since(releaseStart).Seconds())
 			}
@@ -128,9 +129,9 @@ func (s *ReservationService) CreateReservation(ctx context.Context, input Create
 
 	// 予約作成
 	res := reservation.NewReservation(input.EventID, input.UserID, input.IdempotencyKey, input.SeatIDs, totalAmount)
-	if err := res.Validate(); err != nil {
-		log.Error("予約バリデーション失敗", zap.Error(err))
-		return nil, err
+	if validateErr := res.Validate(); validateErr != nil {
+		log.Error("予約バリデーション失敗", zap.Error(validateErr))
+		return nil, validateErr
 	}
 
 	// トランザクション
@@ -160,6 +161,9 @@ func (s *ReservationService) CreateReservation(ctx context.Context, input Create
 		m.ActiveReservations.WithLabelValues("pending").Inc()
 	}
 
+	// キャッシュ無効化
+	s.invalidateSeatCache(ctx, input.EventID)
+
 	log.Info("予約作成成功", zap.String("reservation_id", res.ID), zap.Int("total_amount", totalAmount))
 	return res, nil
 }
@@ -188,8 +192,8 @@ func (s *ReservationService) ConfirmReservation(ctx context.Context, id string) 
 	if err != nil {
 		return nil, err
 	}
-	if err := res.Confirm(); err != nil {
-		return nil, err
+	if confirmErr := res.Confirm(); confirmErr != nil {
+		return nil, confirmErr
 	}
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -220,8 +224,8 @@ func (s *ReservationService) CancelReservation(ctx context.Context, id string) (
 	if err != nil {
 		return nil, err
 	}
-	if err := res.Cancel(); err != nil {
-		return nil, err
+	if cancelErr := res.Cancel(); cancelErr != nil {
+		return nil, cancelErr
 	}
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -243,7 +247,19 @@ func (s *ReservationService) CancelReservation(ctx context.Context, id string) (
 		m.ActiveReservations.WithLabelValues("pending").Dec()
 	}
 
+	// キャッシュ無効化
+	s.invalidateSeatCache(ctx, res.EventID)
+
 	return res, nil
+}
+
+// invalidateSeatCache は座席キャッシュを無効化する
+func (s *ReservationService) invalidateSeatCache(ctx context.Context, eventID string) {
+	if s.seatCache != nil {
+		if err := s.seatCache.Invalidate(ctx, eventID); err != nil {
+			logger.Warn("キャッシュ無効化エラー", zap.String("event_id", eventID), zap.Error(err))
+		}
+	}
 }
 
 // CancelExpiredReservations は期限切れの予約をキャンセルして座席を解放する
@@ -274,13 +290,13 @@ func (s *ReservationService) CancelExpiredReservations(ctx context.Context, expi
 
 		if err := s.seatRepo.ReleaseSeats(ctx, tx, res.SeatIDs); err != nil {
 			log.Error("座席解放に失敗", zap.Error(err))
-			tx.Rollback()
+			_ = tx.Rollback()
 			continue
 		}
 
 		if err := s.reservationRepo.Update(ctx, tx, res); err != nil {
 			log.Error("予約更新に失敗", zap.Error(err))
-			tx.Rollback()
+			_ = tx.Rollback()
 			continue
 		}
 

@@ -74,8 +74,10 @@ func main() {
 		logger.Warn("Redis接続エラー（分散ロック無効）", zap.Error(err))
 	}
 	var lockManager *redisinfra.LockManager
+	var seatCache *redisinfra.SeatCache
 	if redisClient != nil {
 		lockManager = redisinfra.NewLockManager(redisClient)
+		seatCache = redisinfra.NewSeatCache(redisClient)
 		defer redisClient.Close()
 		logger.Info("Redis接続成功")
 	}
@@ -87,8 +89,8 @@ func main() {
 
 	// Services
 	eventService := application.NewEventService(eventRepo)
-	seatService := application.NewSeatService(db, seatRepo, eventRepo)
-	reservationService := application.NewReservationService(db, reservationRepo, seatRepo, eventRepo, lockManager)
+	seatService := application.NewSeatService(db, seatRepo, eventRepo, seatCache)
+	reservationService := application.NewReservationService(db, reservationRepo, seatRepo, eventRepo, lockManager, seatCache)
 
 	// Handlers
 	eventHandler := handler.NewEventHandler(eventService)

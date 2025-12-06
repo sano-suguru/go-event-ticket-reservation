@@ -566,3 +566,286 @@ gantt
   checks_succeeded: 100.00% 30 out of 30
   http_req_duration: avg=2.39ms p(95)=3.97ms
 ```
+
+### 本番シナリオ実行結果
+
+50人が同時に同じ座席を予約する競合テストを実施しました。
+
+```
+█ THRESHOLDS 
+  http_req_duration ✓ 'p(95)<500' p(95)=10.77ms
+  http_req_failed   ✓ 'rate<0.1' rate=1.34%
+  reservation_success ✓ 'count>0' count=1
+
+█ TOTAL RESULTS 
+  checks_succeeded: 100.00% 3611 out of 3611
+  http_reqs: 3712 (24.6 req/sec)
+```
+
+| 結果 | 件数 | 意味 |
+|------|------|------|
+| 予約成功 | 1 | 1人だけが座席を確保（正常） |
+| 競合失敗 | 49 | 49人は競合エラー（正常） |
+| 二重予約 | 0 | 二重予約は発生しない |
+
+**結論**: 分散ロックと楽観的ロックにより、高負荷時も二重予約を完全に防止できています。
+
+---
+
+## ⚡ キャッシュ戦略
+
+### なぜキャッシュが必要か
+
+「残り〇席」の表示は頻繁にアクセスされます。毎回データベースに問い合わせると負荷が集中するため、Redis にキャッシュして高速化します。
+
+```mermaid
+sequenceDiagram
+    participant User as 👤 ユーザー
+    participant Server as 🖥️ サーバー
+    participant Redis as ⚡ Redis
+    participant DB as 🗄️ PostgreSQL
+
+    Note over User,DB: 1回目のリクエスト（キャッシュミス）
+    User->>Server: GET /seats/available/count
+    Server->>Redis: GET seats:available:event-123
+    Redis-->>Server: (nil) キャッシュなし
+    Server->>DB: SELECT COUNT(*) WHERE status='available'
+    DB-->>Server: 42
+    Server->>Redis: SET seats:available:event-123 42 EX 30
+    Server-->>User: {"count": 42}
+
+    Note over User,DB: 2回目のリクエスト（キャッシュヒット）
+    User->>Server: GET /seats/available/count
+    Server->>Redis: GET seats:available:event-123
+    Redis-->>Server: 42
+    Server-->>User: {"count": 42}
+    Note right of Server: DBアクセス不要！
+```
+
+### キャッシュの実装
+
+```go
+// internal/infrastructure/redis/seat_cache.go より
+
+// キャッシュキー: "seats:available:{イベントID}"
+func (c *SeatCache) availableCountKey(eventID string) string {
+    return fmt.Sprintf("seats:available:%s", eventID)
+}
+
+// 空席数を取得（キャッシュから）
+func (c *SeatCache) GetAvailableCount(ctx context.Context, eventID string) (int, error) {
+    val, err := c.client.Get(ctx, key).Int()
+    if errors.Is(err, redis.Nil) {
+        return 0, ErrCacheMiss  // キャッシュにない
+    }
+    return val, nil
+}
+```
+
+### キャッシュの利用パターン
+
+```go
+// internal/application/seat_service.go より
+
+func (s *SeatService) CountAvailableSeats(ctx context.Context, eventID string) (int, error) {
+    // 1. キャッシュから取得を試みる
+    if s.cache != nil {
+        count, err := s.cache.GetAvailableCount(ctx, eventID)
+        if err == nil {
+            return count, nil  // キャッシュヒット！
+        }
+    }
+
+    // 2. キャッシュミス → DBから取得
+    count, err := s.seatRepo.CountAvailableByEventID(ctx, eventID)
+    
+    // 3. キャッシュに保存（30秒間有効）
+    if s.cache != nil {
+        s.cache.SetAvailableCount(ctx, eventID, count, 30*time.Second)
+    }
+
+    return count, nil
+}
+```
+
+### キャッシュの無効化
+
+座席の状態が変わったら、キャッシュを削除して最新データを反映します。
+
+```go
+// internal/application/reservation_service.go より
+
+// 予約成功後、キャッシュを無効化
+func (s *ReservationService) CreateReservation(...) {
+    // ... 予約処理 ...
+    
+    // キャッシュを削除（次回アクセス時にDBから再取得される）
+    s.invalidateSeatCache(ctx, input.EventID)
+}
+```
+
+| イベント | キャッシュ操作 |
+|---------|--------------|
+| 座席数を取得 | キャッシュから読む（なければDBから取得して保存） |
+| 予約を作成 | キャッシュを削除 |
+| 予約をキャンセル | キャッシュを削除 |
+
+### TTL（有効期限）の考え方
+
+| 値 | メリット | デメリット |
+|----|---------|-----------|
+| 短い（10秒） | データが常に最新 | キャッシュ効果が薄い |
+| 長い（5分） | DBアクセス削減 | 古いデータが表示される |
+| **30秒（採用）** | バランスが良い | - |
+
+**30秒を選んだ理由**: チケット予約では「残り5席」が「残り3席」に変わっても許容範囲。ただし、売り切れ後すぐに反映されないと問題なので、長すぎる TTL は避けました。
+
+---
+
+## 🔄 CI/CD パイプライン
+
+### GitHub Actions ワークフロー
+
+コードを push すると自動で品質チェックが実行されます。
+
+```mermaid
+flowchart LR
+    subgraph トリガー
+        Push[push to main]
+        PR[Pull Request]
+    end
+    
+    subgraph CI パイプライン
+        Lint[Lint<br/>コード品質チェック]
+        Test[Test<br/>単体・統合テスト]
+        Build[Build<br/>ビルド確認]
+    end
+    
+    Push --> Lint
+    PR --> Lint
+    Lint --> Test
+    Test --> Build
+    
+    style Lint fill:#fff3e0
+    style Test fill:#e3f2fd
+    style Build fill:#e8f5e9
+```
+
+### ワークフロー設定
+
+```yaml
+# .github/workflows/ci.yml
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    # golangci-lint でコード品質をチェック
+    steps:
+      - uses: golangci/golangci-lint-action@v4
+        with:
+          args: --timeout=5m
+
+  test:
+    # PostgreSQL と Redis をサービスコンテナとして起動
+    services:
+      postgres:
+        image: postgres:16-alpine
+      redis:
+        image: redis:7-alpine
+    steps:
+      - run: go test -v -race -coverprofile=coverage.out ./...
+
+  build:
+    # lint と test が成功した場合のみ実行
+    needs: [lint, test]
+    steps:
+      - run: go build -v ./cmd/api
+```
+
+### チェック内容
+
+| ジョブ | 内容 | 失敗時 |
+|-------|------|--------|
+| **Lint** | コードスタイル、潜在的バグ検出 | PR をマージ不可 |
+| **Test** | 全テスト実行（DB/Redis 使用） | PR をマージ不可 |
+| **Build** | バイナリがビルドできるか確認 | PR をマージ不可 |
+
+### golangci-lint の設定
+
+```yaml
+# .golangci.yml
+
+linters:
+  enable:
+    - errcheck      # エラーハンドリング漏れ
+    - govet         # 一般的なバグパターン
+    - staticcheck   # 静的解析
+    - goimports     # import の整理
+    - misspell      # スペルミス
+```
+
+### ローカルでの実行
+
+```bash
+# lint を手元で実行
+golangci-lint run
+
+# テストを実行
+go test ./... -v -race
+```
+
+---
+
+## 📦 まとめ
+
+本システムは以下の技術で**二重予約を防ぎながら高速なレスポンス**を実現しています。
+
+| 課題 | 解決策 |
+|------|--------|
+| 同時アクセスで二重予約 | Redis 分散ロック + PostgreSQL 楽観的ロック |
+| ネットワーク障害で重複リクエスト | 冪等性キーで同じ処理を1回だけ実行 |
+| DB への負荷集中 | Redis キャッシュで空席数を高速取得 |
+| コード品質の維持 | GitHub Actions で自動テスト・lint |
+| 仮押さえの放置 | バックグラウンドワーカーで15分後に自動解放 |
+
+```mermaid
+flowchart TB
+    Request[ユーザーリクエスト]
+    
+    subgraph Step1 [1. 冪等性チェック]
+        Idempotency[同じリクエストなら<br/>既存結果を返す]
+    end
+    
+    subgraph Step2 [2. 分散ロック]
+        Lock[Redis SetNX<br/>1人だけが処理を続行]
+    end
+    
+    subgraph Step3 [3. トランザクション]
+        TX[PostgreSQL<br/>楽観的ロックで座席更新]
+    end
+    
+    subgraph Step4 [4. キャッシュ無効化]
+        Cache[Redis DEL<br/>次回は最新データを取得]
+    end
+    
+    Success[予約完了]
+    
+    Request --> Step1
+    Step1 --> Step2
+    Step2 --> Step3
+    Step3 --> Step4
+    Step4 --> Success
+    
+    style Step1 fill:#e8f5e9
+    style Step2 fill:#fff3e0
+    style Step3 fill:#e3f2fd
+    style Step4 fill:#fce4ec
+    style Success fill:#c8e6c9
+```

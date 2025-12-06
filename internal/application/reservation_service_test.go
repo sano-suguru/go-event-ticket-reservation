@@ -37,8 +37,8 @@ func setupTestEnv(t *testing.T) (*ReservationService, *SeatService, *EventServic
 	reservationRepo := postgres.NewReservationRepository(db)
 
 	eventService := NewEventService(eventRepo)
-	seatService := NewSeatService(db, seatRepo, eventRepo)
-	reservationService := NewReservationService(db, reservationRepo, seatRepo, eventRepo, lockManager)
+	seatService := NewSeatService(db, seatRepo, eventRepo, nil)
+	reservationService := NewReservationService(db, reservationRepo, seatRepo, eventRepo, lockManager, nil)
 
 	cleanup := func() {
 		db.Exec("DELETE FROM reservation_seats")

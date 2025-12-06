@@ -2,21 +2,32 @@ package application
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jmoiron/sqlx"
+	"go.uber.org/zap"
+
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/domain/event"
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/domain/seat"
+	redisinfra "github.com/sanosuguru/go-event-ticket-reservation/internal/infrastructure/redis"
+	"github.com/sanosuguru/go-event-ticket-reservation/internal/pkg/logger"
+)
+
+const (
+	seatCacheTTL = 30 * time.Second
 )
 
 type SeatService struct {
 	db        *sqlx.DB
 	seatRepo  seat.Repository
 	eventRepo event.Repository
+	cache     *redisinfra.SeatCache
 }
 
-func NewSeatService(db *sqlx.DB, sr seat.Repository, er event.Repository) *SeatService {
-	return &SeatService{db: db, seatRepo: sr, eventRepo: er}
+func NewSeatService(db *sqlx.DB, sr seat.Repository, er event.Repository, cache *redisinfra.SeatCache) *SeatService {
+	return &SeatService{db: db, seatRepo: sr, eventRepo: er, cache: cache}
 }
 
 type CreateSeatInput struct {
@@ -78,5 +89,39 @@ func (s *SeatService) GetAvailableSeatsByEvent(ctx context.Context, eventID stri
 }
 
 func (s *SeatService) CountAvailableSeats(ctx context.Context, eventID string) (int, error) {
-	return s.seatRepo.CountAvailableByEventID(ctx, eventID)
+	// キャッシュから取得を試みる
+	if s.cache != nil {
+		count, err := s.cache.GetAvailableCount(ctx, eventID)
+		if err == nil {
+			logger.Debug("キャッシュヒット", zap.String("event_id", eventID), zap.Int("count", count))
+			return count, nil
+		}
+		if !errors.Is(err, redisinfra.ErrCacheMiss) {
+			logger.Warn("キャッシュ取得エラー", zap.Error(err))
+		}
+	}
+
+	// DBから取得
+	count, err := s.seatRepo.CountAvailableByEventID(ctx, eventID)
+	if err != nil {
+		return 0, err
+	}
+
+	// キャッシュに保存
+	if s.cache != nil {
+		if cacheErr := s.cache.SetAvailableCount(ctx, eventID, count, seatCacheTTL); cacheErr != nil {
+			logger.Warn("キャッシュ保存エラー", zap.Error(cacheErr))
+		}
+	}
+
+	return count, nil
+}
+
+// InvalidateCache はイベントのキャッシュを無効化する
+func (s *SeatService) InvalidateCache(ctx context.Context, eventID string) {
+	if s.cache != nil {
+		if err := s.cache.Invalidate(ctx, eventID); err != nil {
+			logger.Warn("キャッシュ無効化エラー", zap.Error(err))
+		}
+	}
 }

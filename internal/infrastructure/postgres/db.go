@@ -6,6 +6,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/config"
 )
 

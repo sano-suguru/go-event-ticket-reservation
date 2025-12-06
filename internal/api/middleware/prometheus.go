@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/pkg/metrics"
 )
 
