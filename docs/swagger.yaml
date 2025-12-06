@@ -1,0 +1,453 @@
+basePath: /api/v1
+definitions:
+  handler.CreateEventRequest:
+    properties:
+      description:
+        example: 年末スペシャルコンサート
+        type: string
+      end_at:
+        example: "2025-12-31T21:00:00+09:00"
+        type: string
+      name:
+        example: 東京ドームコンサート2025
+        type: string
+      start_at:
+        example: "2025-12-31T18:00:00+09:00"
+        type: string
+      total_seats:
+        example: 50000
+        type: integer
+      venue:
+        example: 東京ドーム
+        type: string
+    required:
+    - end_at
+    - name
+    - start_at
+    - total_seats
+    type: object
+  handler.CreateReservationRequest:
+    properties:
+      event_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      idempotency_key:
+        example: order-2025-001
+        type: string
+      seat_ids:
+        example:
+        - seat-A1
+        - seat-A2
+        items:
+          type: string
+        minItems: 1
+        type: array
+    required:
+    - event_id
+    - idempotency_key
+    - seat_ids
+    type: object
+  handler.EventResponse:
+    properties:
+      created_at:
+        example: "2025-12-06T10:00:00+09:00"
+        type: string
+      description:
+        example: 年末スペシャルコンサート
+        type: string
+      end_at:
+        example: "2025-12-31T21:00:00+09:00"
+        type: string
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      name:
+        example: 東京ドームコンサート2025
+        type: string
+      start_at:
+        example: "2025-12-31T18:00:00+09:00"
+        type: string
+      total_seats:
+        example: 50000
+        type: integer
+      updated_at:
+        example: "2025-12-06T10:00:00+09:00"
+        type: string
+      venue:
+        example: 東京ドーム
+        type: string
+    type: object
+  handler.HealthResponse:
+    properties:
+      status:
+        type: string
+      timestamp:
+        type: string
+    type: object
+  handler.ReservationResponse:
+    properties:
+      confirmed_at:
+        type: string
+      created_at:
+        type: string
+      event_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      expires_at:
+        type: string
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      seat_ids:
+        example:
+        - seat-A1
+        - seat-A2
+        items:
+          type: string
+        type: array
+      status:
+        example: pending
+        type: string
+      total_amount:
+        example: 10000
+        type: integer
+      user_id:
+        example: user-123
+        type: string
+    type: object
+host: localhost:8081
+info:
+  contact:
+    email: support@example.com
+    name: API Support
+  description: 高並行性イベントチケット予約システムのREST API
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://example.com/terms/
+  title: イベントチケット予約システム API
+  version: "1.0"
+paths:
+  /api/v1/health:
+    get:
+      description: アプリケーションの健全性を確認する
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HealthResponse'
+      summary: ヘルスチェック
+      tags:
+      - health
+  /events:
+    get:
+      description: イベントの一覧を取得します
+      parameters:
+      - default: 20
+        description: 取得件数
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: オフセット
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handler.EventResponse'
+            type: array
+      summary: イベント一覧を取得
+      tags:
+      - events
+    post:
+      consumes:
+      - application/json
+      description: 新しいイベントを作成します
+      parameters:
+      - description: イベント情報
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CreateEventRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handler.EventResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: イベントを作成
+      tags:
+      - events
+  /events/{id}:
+    delete:
+      description: 指定IDのイベントを削除します
+      parameters:
+      - description: イベントID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: イベントを削除
+      tags:
+      - events
+    get:
+      description: 指定IDのイベントを取得します
+      parameters:
+      - description: イベントID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.EventResponse'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: イベントを取得
+      tags:
+      - events
+    put:
+      consumes:
+      - application/json
+      description: 指定IDのイベントを更新します
+      parameters:
+      - description: イベントID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: イベント情報
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CreateEventRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.EventResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: イベントを更新
+      tags:
+      - events
+  /reservations:
+    get:
+      description: ログインユーザーの予約一覧を取得します
+      parameters:
+      - description: ユーザーID
+        in: header
+        name: X-User-ID
+        required: true
+        type: string
+      - default: 20
+        description: 取得件数
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: オフセット
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handler.ReservationResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: ユーザーの予約一覧を取得
+      tags:
+      - reservations
+    post:
+      consumes:
+      - application/json
+      description: 座席を仮押さえします（15分間有効）
+      parameters:
+      - description: ユーザーID
+        in: header
+        name: X-User-ID
+        required: true
+        type: string
+      - description: 予約情報
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CreateReservationRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handler.ReservationResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: 座席が既に予約済み
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 予約を作成
+      tags:
+      - reservations
+  /reservations/{id}:
+    get:
+      description: 指定IDの予約を取得します
+      parameters:
+      - description: 予約ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ReservationResponse'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 予約を取得
+      tags:
+      - reservations
+  /reservations/{id}/cancel:
+    post:
+      description: 予約をキャンセルし、座席を解放します
+      parameters:
+      - description: 予約ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ReservationResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 予約をキャンセル
+      tags:
+      - reservations
+  /reservations/{id}/confirm:
+    post:
+      description: 仮押さえ中の予約を確定します
+      parameters:
+      - description: 予約ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ReservationResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 予約を確定
+      tags:
+      - reservations
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: X-User-ID
+    type: apiKey
+swagger: "2.0"

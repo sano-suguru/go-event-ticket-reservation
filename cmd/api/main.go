@@ -10,8 +10,11 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	echoSwagger "github.com/swaggo/echo-swagger"
 	"go.uber.org/zap"
 
+	_ "github.com/sanosuguru/go-event-ticket-reservation/docs"
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/api/handler"
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/api/middleware"
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/application"
@@ -19,8 +22,27 @@ import (
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/infrastructure/postgres"
 	redisinfra "github.com/sanosuguru/go-event-ticket-reservation/internal/infrastructure/redis"
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/pkg/logger"
+	"github.com/sanosuguru/go-event-ticket-reservation/internal/pkg/metrics"
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/worker"
 )
+
+// @title イベントチケット予約システム API
+// @version 1.0
+// @description 高並行性イベントチケット予約システムのREST API
+// @termsOfService http://example.com/terms/
+
+// @contact.name API Support
+// @contact.email support@example.com
+
+// @license.name Apache 2.0
+// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
+
+// @host localhost:8081
+// @BasePath /api/v1
+
+// @securityDefinitions.apikey ApiKeyAuth
+// @in header
+// @name X-User-ID
 
 func main() {
 	cfg := config.Load()
@@ -74,8 +96,20 @@ func main() {
 	reservationHandler := handler.NewReservationHandler(reservationService)
 	healthHandler := handler.NewHealthHandler()
 
+	// Prometheusメトリクス初期化
+	appMetrics := metrics.Init()
+
 	e := echo.New()
 	middleware.SetupMiddleware(e)
+
+	// Prometheusミドルウェア追加
+	e.Use(middleware.PrometheusMiddleware(appMetrics))
+
+	// メトリクスエンドポイント
+	e.GET("/metrics", echo.WrapHandler(promhttp.Handler()))
+
+	// Swagger UI
+	e.GET("/swagger/*", echoSwagger.WrapHandler)
 
 	api := e.Group("/api/v1")
 	api.GET("/health", healthHandler.Check)

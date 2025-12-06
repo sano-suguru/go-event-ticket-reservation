@@ -16,6 +16,7 @@ import (
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/domain/seat"
 	redislock "github.com/sanosuguru/go-event-ticket-reservation/internal/infrastructure/redis"
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/pkg/logger"
+	"github.com/sanosuguru/go-event-ticket-reservation/internal/pkg/metrics"
 )
 
 type ReservationService struct {
@@ -61,8 +62,14 @@ func (s *ReservationService) CreateReservation(ctx context.Context, input Create
 	var lock *redislock.DistributedLock
 	if s.lockManager != nil {
 		log.Debug("分散ロック取得中", zap.String("lock_key", lockKey))
+		lockStart := time.Now()
 		lock, err = s.lockManager.AcquireLockWithRetry(ctx, lockKey, 10*time.Second, 3, 100*time.Millisecond)
+		lockDuration := time.Since(lockStart).Seconds()
 		if err != nil {
+			if m := metrics.Get(); m != nil {
+				m.DistributedLockDuration.WithLabelValues("acquire", "failed").Observe(lockDuration)
+				m.ReservationsTotal.WithLabelValues("lock_failed").Inc()
+			}
 			if errors.Is(err, redislock.ErrLockNotAcquired) {
 				log.Warn("分散ロック取得失敗: 他のユーザーが処理中")
 				return nil, fmt.Errorf("座席が他のユーザーによって処理中です")
@@ -70,7 +77,16 @@ func (s *ReservationService) CreateReservation(ctx context.Context, input Create
 			log.Error("ロック取得に失敗", zap.Error(err))
 			return nil, fmt.Errorf("ロック取得に失敗: %w", err)
 		}
-		defer lock.Release(ctx)
+		if m := metrics.Get(); m != nil {
+			m.DistributedLockDuration.WithLabelValues("acquire", "success").Observe(lockDuration)
+		}
+		defer func() {
+			releaseStart := time.Now()
+			lock.Release(ctx)
+			if m := metrics.Get(); m != nil {
+				m.DistributedLockDuration.WithLabelValues("release", "success").Observe(time.Since(releaseStart).Seconds())
+			}
+		}()
 		log.Debug("分散ロック取得成功")
 	}
 
@@ -102,6 +118,9 @@ func (s *ReservationService) CreateReservation(ctx context.Context, input Create
 		}
 		if !se.IsAvailable() {
 			log.Warn("座席が既に予約済み", zap.String("seat_id", id), zap.String("status", string(se.Status)))
+			if m := metrics.Get(); m != nil {
+				m.ReservationsTotal.WithLabelValues("conflict").Inc()
+			}
 			return nil, seat.ErrSeatAlreadyReserved
 		}
 		totalAmount += se.Price
@@ -133,6 +152,12 @@ func (s *ReservationService) CreateReservation(ctx context.Context, input Create
 	if err := tx.Commit(); err != nil {
 		log.Error("コミットに失敗", zap.Error(err))
 		return nil, fmt.Errorf("コミットに失敗: %w", err)
+	}
+
+	// メトリクス記録: 予約成功
+	if m := metrics.Get(); m != nil {
+		m.ReservationsTotal.WithLabelValues("success").Inc()
+		m.ActiveReservations.WithLabelValues("pending").Inc()
 	}
 
 	log.Info("予約作成成功", zap.String("reservation_id", res.ID), zap.Int("total_amount", totalAmount))
@@ -180,6 +205,13 @@ func (s *ReservationService) ConfirmReservation(ctx context.Context, id string) 
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("コミットに失敗: %w", err)
 	}
+
+	// メトリクス記録: 予約確定
+	if m := metrics.Get(); m != nil {
+		m.ActiveReservations.WithLabelValues("pending").Dec()
+		m.ActiveReservations.WithLabelValues("confirmed").Inc()
+	}
+
 	return res, nil
 }
 
@@ -205,6 +237,12 @@ func (s *ReservationService) CancelReservation(ctx context.Context, id string) (
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("コミットに失敗: %w", err)
 	}
+
+	// メトリクス記録: 予約キャンセル
+	if m := metrics.Get(); m != nil {
+		m.ActiveReservations.WithLabelValues("pending").Dec()
+	}
+
 	return res, nil
 }
 
