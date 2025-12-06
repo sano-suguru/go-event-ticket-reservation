@@ -1,8 +1,10 @@
 package config
 
 import (
+	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -40,7 +42,7 @@ type RedisConfig struct {
 
 // Load は環境変数から設定を読み込む
 func Load() *Config {
-	return &Config{
+	cfg := &Config{
 		Server: ServerConfig{
 			Port:         getEnv("PORT", "8080"),
 			ReadTimeout:  getDurationEnv("SERVER_READ_TIMEOUT", 30*time.Second),
@@ -61,6 +63,42 @@ func Load() *Config {
 			DB:       getIntEnv("REDIS_DB", 0),
 		},
 	}
+
+	// DATABASE_URL が設定されている場合はパースして上書き（Railway対応）
+	if dbURL := os.Getenv("DATABASE_URL"); dbURL != "" {
+		if parsed, err := url.Parse(dbURL); err == nil {
+			cfg.Database.Host = parsed.Hostname()
+			cfg.Database.Port = parsed.Port()
+			if parsed.User != nil {
+				cfg.Database.User = parsed.User.Username()
+				if pwd, ok := parsed.User.Password(); ok {
+					cfg.Database.Password = pwd
+				}
+			}
+			cfg.Database.DBName = strings.TrimPrefix(parsed.Path, "/")
+			// クエリパラメータからsslmodeを取得
+			if sslmode := parsed.Query().Get("sslmode"); sslmode != "" {
+				cfg.Database.SSLMode = sslmode
+			} else {
+				cfg.Database.SSLMode = "require" // Railwayではデフォルトでrequire
+			}
+		}
+	}
+
+	// REDIS_URL が設定されている場合はパースして上書き（Railway対応）
+	if redisURL := os.Getenv("REDIS_URL"); redisURL != "" {
+		if parsed, err := url.Parse(redisURL); err == nil {
+			cfg.Redis.Host = parsed.Hostname()
+			cfg.Redis.Port = parsed.Port()
+			if parsed.User != nil {
+				if pwd, ok := parsed.User.Password(); ok {
+					cfg.Redis.Password = pwd
+				}
+			}
+		}
+	}
+
+	return cfg
 }
 
 // DSN はPostgreSQL接続文字列を返す
