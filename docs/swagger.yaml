@@ -127,19 +127,6 @@ info:
   title: イベントチケット予約システム API
   version: "1.0"
 paths:
-  /api/v1/health:
-    get:
-      description: アプリケーションの健全性を確認する
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handler.HealthResponse'
-      summary: ヘルスチェック
-      tags:
-      - health
   /events:
     get:
       description: イベントの一覧を取得します
@@ -276,6 +263,19 @@ paths:
       summary: イベントを更新
       tags:
       - events
+  /health:
+    get:
+      description: アプリケーションの健全性を確認する
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HealthResponse'
+      summary: ヘルスチェック
+      tags:
+      - health
   /reservations:
     get:
       description: ログインユーザーの予約一覧を取得します

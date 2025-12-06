@@ -27,7 +27,7 @@ type HealthResponse struct {
 // @Tags health
 // @Produce json
 // @Success 200 {object} HealthResponse
-// @Router /api/v1/health [get]
+// @Router /health [get]
 func (h *HealthHandler) Check(c echo.Context) error {
 	return c.JSON(http.StatusOK, HealthResponse{
 		Status:    "ok",
