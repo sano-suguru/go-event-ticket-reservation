@@ -1,5 +1,7 @@
 # バイナリ
 bin/
+api
+server
 *.exe
 *.exe~
 *.dll

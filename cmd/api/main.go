@@ -63,6 +63,12 @@ func main() {
 	defer db.Close()
 	logger.Info("データベース接続成功")
 
+	// マイグレーション実行（起動時に自動実行）
+	if err := postgres.RunMigrations(db.DB, "db/migrations"); err != nil {
+		logger.Fatal("マイグレーションエラー", zap.Error(err))
+	}
+	logger.Info("マイグレーション完了")
+
 	// Redis接続
 	redisClient, err := redisinfra.NewClient(&redisinfra.Config{
 		Host:     cfg.Redis.Host,
