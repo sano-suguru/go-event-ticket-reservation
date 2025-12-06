@@ -64,8 +64,8 @@ func main() {
 	logger.Info("データベース接続成功")
 
 	// マイグレーション実行（起動時に自動実行）
-	if err := postgres.RunMigrations(db.DB, "db/migrations"); err != nil {
-		logger.Fatal("マイグレーションエラー", zap.Error(err))
+	if migrationErr := postgres.RunMigrations(db.DB, "db/migrations"); migrationErr != nil {
+		logger.Fatal("マイグレーションエラー", zap.Error(migrationErr))
 	}
 	logger.Info("マイグレーション完了")
 
