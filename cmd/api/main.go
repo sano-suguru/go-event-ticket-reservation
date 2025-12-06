@@ -116,6 +116,9 @@ func main() {
 	// メトリクスエンドポイント
 	e.GET("/metrics", echo.WrapHandler(promhttp.Handler()))
 
+	// ヘルスチェック（ルートレベル - Railway/K8s対応）
+	e.GET("/health", healthHandler.Check)
+
 	// Swagger UI
 	e.GET("/swagger/*", echoSwagger.WrapHandler)
 
