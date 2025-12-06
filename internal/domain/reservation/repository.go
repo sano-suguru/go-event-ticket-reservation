@@ -2,6 +2,7 @@ package reservation
 
 import (
 	"context"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -24,5 +25,5 @@ type Repository interface {
 	Update(ctx context.Context, tx *sqlx.Tx, reservation *Reservation) error
 
 	// GetExpiredPending は期限切れの保留中予約を取得する
-	GetExpiredPending(ctx context.Context) ([]*Reservation, error)
+	GetExpiredPending(ctx context.Context, expireAfter time.Duration) ([]*Reservation, error)
 }

@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -11,22 +10,36 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"go.uber.org/zap"
+
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/api/handler"
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/api/middleware"
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/application"
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/config"
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/infrastructure/postgres"
 	redisinfra "github.com/sanosuguru/go-event-ticket-reservation/internal/infrastructure/redis"
+	"github.com/sanosuguru/go-event-ticket-reservation/internal/pkg/logger"
+	"github.com/sanosuguru/go-event-ticket-reservation/internal/worker"
 )
 
 func main() {
 	cfg := config.Load()
 
+	// ロガー初期化
+	env := os.Getenv("APP_ENV")
+	if env == "" {
+		env = "development"
+	}
+	log := logger.NewLogger(env)
+	logger.Set(log)
+	defer logger.Sync()
+
 	db, err := postgres.NewConnection(&cfg.Database)
 	if err != nil {
-		log.Fatalf("DB接続エラー: %v", err)
+		logger.Fatal("DB接続エラー", zap.Error(err))
 	}
 	defer db.Close()
+	logger.Info("データベース接続成功")
 
 	// Redis接続
 	redisClient, err := redisinfra.NewClient(&redisinfra.Config{
@@ -36,12 +49,13 @@ func main() {
 		DB:       cfg.Redis.DB,
 	})
 	if err != nil {
-		log.Printf("Redis接続エラー（分散ロック無効）: %v", err)
+		logger.Warn("Redis接続エラー（分散ロック無効）", zap.Error(err))
 	}
 	var lockManager *redisinfra.LockManager
 	if redisClient != nil {
 		lockManager = redisinfra.NewLockManager(redisClient)
 		defer redisClient.Close()
+		logger.Info("Redis接続成功")
 	}
 
 	// Repositories
@@ -87,10 +101,20 @@ func main() {
 	api.POST("/reservations/:id/confirm", reservationHandler.Confirm)
 	api.POST("/reservations/:id/cancel", reservationHandler.Cancel)
 
+	// 期限切れ予約クリーナーを開始
+	ctx, cancel := context.WithCancel(context.Background())
+	cleaner := worker.NewExpiredReservationCleaner(
+		reservationService,
+		1*time.Minute,  // 1分ごとにチェック
+		15*time.Minute, // 15分以上経過した予約をキャンセル
+	)
+	go cleaner.Start(ctx)
+
 	go func() {
 		addr := fmt.Sprintf(":%s", cfg.Server.Port)
+		logger.Info("サーバー起動", zap.String("addr", addr))
 		if err := e.Start(addr); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("サーバー起動エラー: %v", err)
+			logger.Fatal("サーバー起動エラー", zap.Error(err))
 		}
 	}()
 
@@ -98,12 +122,19 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Println("サーバーをシャットダウンしています...")
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	logger.Info("シャットダウン開始...")
 
-	if err := e.Shutdown(ctx); err != nil {
-		log.Fatalf("シャットダウンエラー: %v", err)
+	// ワーカーを停止
+	cancel()
+	cleaner.Stop()
+	logger.Info("バックグラウンドワーカー停止完了")
+
+	// サーバーをシャットダウン
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer shutdownCancel()
+
+	if err := e.Shutdown(shutdownCtx); err != nil {
+		logger.Error("サーバーシャットダウンエラー", zap.Error(err))
 	}
-	log.Println("サーバーが正常にシャットダウンしました")
+	logger.Info("サーバーが正常にシャットダウンしました")
 }

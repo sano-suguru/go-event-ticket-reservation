@@ -109,9 +109,10 @@ func (r *ReservationRepository) Update(ctx context.Context, tx *sqlx.Tx, res *re
 	return nil
 }
 
-func (r *ReservationRepository) GetExpiredPending(ctx context.Context) ([]*reservation.Reservation, error) {
+func (r *ReservationRepository) GetExpiredPending(ctx context.Context, expireAfter time.Duration) ([]*reservation.Reservation, error) {
 	var rows []reservationRow
-	if err := r.db.SelectContext(ctx, &rows, `SELECT id, event_id, user_id, status, idempotency_key, total_amount, expires_at, confirmed_at, created_at, updated_at FROM reservations WHERE status = 'pending' AND expires_at < NOW()`); err != nil {
+	cutoff := time.Now().Add(-expireAfter)
+	if err := r.db.SelectContext(ctx, &rows, `SELECT id, event_id, user_id, status, idempotency_key, total_amount, expires_at, confirmed_at, created_at, updated_at FROM reservations WHERE status = 'pending' AND created_at < $1`, cutoff); err != nil {
 		return nil, fmt.Errorf("期限切れ予約取得に失敗: %w", err)
 	}
 	result := make([]*reservation.Reservation, len(rows))

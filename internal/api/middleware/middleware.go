@@ -10,12 +10,8 @@ func SetupMiddleware(e *echo.Echo) {
 	// リクエストID
 	e.Use(middleware.RequestID())
 
-	// リクエストログ
-	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
-		Format: `{"time":"${time_rfc3339_nano}","id":"${id}","remote_ip":"${remote_ip}",` +
-			`"method":"${method}","uri":"${uri}","status":${status},"latency":${latency},` +
-			`"latency_human":"${latency_human}","bytes_in":${bytes_in},"bytes_out":${bytes_out}}` + "\n",
-	}))
+	// 構造化リクエストログ（zap）
+	e.Use(RequestLogger())
 
 	// パニックリカバリー
 	e.Use(middleware.Recover())
