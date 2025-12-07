@@ -201,8 +201,24 @@ stateDiagram-v2
 
 nginx + 3台の API サーバーで100人同時予約:
 
+```mermaid
+flowchart LR
+    Client[100並行ユーザー] --> LB[nginx]
+    LB --> API1[API Server 1]
+    LB --> API2[API Server 2]
+    LB --> API3[API Server 3]
+    API1 --> Redis[(Redis)]
+    API2 --> Redis
+    API3 --> Redis
+    API1 --> DB[(PostgreSQL)]
+    API2 --> DB
+    API3 --> DB
+    
+    style Redis fill:#fff3e0
+    style DB fill:#e3f2fd
 ```
-サーバー構成: nginx (LB) → api-1, api-2, api-3 → Redis/PostgreSQL (共有)
+
+```
 予約成功:   1 件（3台に分散しても1人だけ成功）
 競合失敗:  99 件
 二重予約:   0 件
