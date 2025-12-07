@@ -1,69 +1,112 @@
 # Go イベントチケット予約システム - AI エージェント向けガイドライン
 
-本プロジェクトは、楽観的ロック、分散ロック、冪等性などの高度なバックエンド技術を実装した、高並行性イベントチケット予約システムです。
+本プロジェクトは、楽観的ロック、分散ロック、冪等性などの高度なバックエンド技術を実装した、高並行性イベントチケット予約システムです。二重予約ゼロを保証するため、3 層防御を実装しています。
 
 ## 最初に必ず読むこと
 
-**調査や実装を開始する前に、必ず `README.md` を読んでください。** README には以下の重要な情報が含まれています：
+**調査や実装を開始する前に、必ず以下のドキュメントを読んでください：**
 
-- プロジェクトの背景と目的
-- 詳細なアーキテクチャ設計とその理由
-- データベース設計（テーブル定義、インデックス）
-- API 設計（エンドポイント一覧）
-- 実装フェーズと優先順位
-- コード例とベストプラクティス
+- **`README.md`**: プロジェクトの背景と目的、アーキテクチャ設計、データベース設計、API 設計
+- **`docs/PROJECT_PLAN.md`**: 実装フェーズと優先順位、コード例とベストプラクティス
 
-## プロジェクト概要・アーキテクチャ
+## 技術スタック
 
-- **アーキテクチャ**: Clean Architecture（単方向依存: API -> Application -> Domain <- Infrastructure）
 - **言語**: Go（最新安定版）
 - **フレームワーク**: Echo（Web フレームワーク）
 - **データベース**: PostgreSQL（メイン）、Redis（キャッシュ・分散ロック）
 - **ORM/クエリ**: `sqlx`を使用（重量級 ORM は使用しない）
-- **インフラ**: ローカル開発は Docker Compose、本番想定は AWS CDK
+- **インフラ**: ローカル開発は Docker Compose
 
-## 主要な実装パターン
+## アーキテクチャ概要
 
-### 1. 並行処理制御
+**Clean Architecture**（依存方向: `api/` → `application/` → `domain/` ← `infrastructure/`）
 
-- **楽観的ロック**: `seats`や`events`の更新時は必ず`version`カラムを使用する
-  - パターン: `UPDATE table SET ..., version = version + 1 WHERE id = $1 AND version = $2`
-  - 更新行数が 0 の場合は`ErrOptimisticLockConflict`を返す
-- **分散ロック**: 高トラフィック時の座席予約など、クリティカルセクションには Redis を使用
-  - TTL 付きの`SetNX`を使用する
+```
+cmd/api/main.go          # エントリーポイント、DI構築
+internal/
+  domain/{event,seat,reservation}/  # エンティティ、リポジトリIF、エラー（外部依存なし）
+  application/           # Service層（トランザクション境界、ユースケース）
+  infrastructure/postgres/  # sqlxによるDB実装
+  infrastructure/redis/     # 分散ロック、キャッシュ
+  api/handler/           # Echoハンドラー、DTO変換
+db/migrations/           # SQLマイグレーションファイル（golang-migrate）
+```
 
-### 2. トランザクション管理
+## 必須の実装パターン
 
-- トランザクションは**アプリケーション層**（Service）で管理する（Domain や Repository では管理しない）
-- トランザクション操作には`*sqlx.Tx`を使用する
-- トランザクション開始直後に`defer tx.Rollback()`を呼び出すこと
+### 1. 分散ロック（Redis SetNX）
 
-### 3. 冪等性
+座席予約の排他制御。`internal/infrastructure/redis/distributed_lock.go` を参照：
 
-- 予約作成時は`idempotency_key`を使用して冪等性チェックを実装する
-- 処理前に既存キーの存在確認を行う
+```go
+// ロック取得（TTL付き、リトライ対応）
+lock, err := s.lockManager.AcquireLockWithRetry(ctx, lockKey, 10*time.Second, 3, 100*time.Millisecond)
+defer lock.Release(ctx)  // 必ず defer で解放
 
-### 4. エラーハンドリング・ログ
+// Luaスクリプトで所有者確認と削除をアトミックに実行
+```
 
-- 構造化ログには`uber-go/zap`を使用する
-- エラーはコンテキストを付与してラップする: `fmt.Errorf("予約作成に失敗: %w", err)`
-- カスタムエラーは Domain 層で定義する（例: `ErrSeatAlreadyReserved`、`ErrNotFound`）
+### 2. 楽観的ロック（version + WHERE 句）
 
-## ディレクトリ構成
+`seats`テーブル更新時は必ず status 条件を含める。`seat_repository.go`を参照：
 
-- `cmd/api/`: メインエントリーポイント
-- `internal/domain/`: エンティティ、リポジトリインターフェース、ドメインサービス（純粋な Go、外部依存なし）
-- `internal/application/`: ユースケース、トランザクション境界
-- `internal/infrastructure/`: DB 実装、Redis アダプター、外部 API
-- `internal/api/`: ハンドラー（Echo）、ミドルウェア、DTO
-- `db/migrations/`: SQL マイグレーションファイル（`golang-migrate`）
+```go
+// 更新件数 != 対象件数 なら ErrSeatAlreadyReserved を返す
+query := `UPDATE seats SET status = 'reserved', version = version + 1
+          WHERE id = ANY($1) AND status = 'available'`
+rows, _ := result.RowsAffected()
+if int(rows) != len(seatIDs) { return seat.ErrSeatAlreadyReserved }
+```
+
+### 3. トランザクション境界
+
+**Application 層のみ**でトランザクション管理。Repository は`*sqlx.Tx`を受け取る：
+
+```go
+tx, _ := s.db.BeginTxx(ctx, nil)
+defer tx.Rollback()  // 必須
+
+s.reservationRepo.Create(ctx, tx, res)
+s.seatRepo.ReserveSeats(ctx, tx, seatIDs, res.ID)
+
+tx.Commit()
+```
+
+### 4. 冪等性チェック
+
+予約作成時に`idempotency_key`で重複防止：
+
+```go
+existing, err := s.reservationRepo.GetByIdempotencyKey(ctx, input.IdempotencyKey)
+if err == nil { return existing, nil }  // 既存予約を返却
+```
+
+## ドメインエラー
+
+各ドメインの`errors.go`で定義。ハンドラーで`errors.Is()`で判定：
+
+- `seat.ErrSeatAlreadyReserved`, `seat.ErrOptimisticLockConflict`
+- `reservation.ErrReservationNotFound`, `event.ErrEventNotOpen`
+
+## 開発コマンド
+
+```bash
+docker compose up -d     # PostgreSQL:5433, Redis:6379
+make migrate-up          # マイグレーション適用
+make run                 # サーバー起動 (localhost:8080)
+make test                # 全テスト実行（-race -cover付き）
+make lint                # golangci-lint
+```
 
 ## テストガイドライン
 
-- すべてのテストで`testify`（assert、require、mock）を使用する
-- **単体テスト**: Domain と Application 層にフォーカスし、リポジトリはモックを使用
-- **統合テスト**: Repository 層のテストには実際の DB/Redis インスタンス（Docker 経由）を使用
-- 複数シナリオをカバーするために**テーブル駆動テスト**を推奨
+- すべてのテストで`testify`（assert、require、mock）を使用
+- **単体テスト**: Domain/Application 層にフォーカス、リポジトリはモック
+- **統合テスト**: 実 DB/Redis（Docker 経由）を使用
+- **並行テスト**: `sync.WaitGroup` + `atomic`で競合検証（`reservation_service_test.go`参照）
+- **E2E テスト**: `e2e/reservation_flow_test.go` - httptest + 実 DB/Redis
+- **テストセットアップ**: 実 DB 接続失敗時は`t.Skipf()`でスキップ
+- **テーブル駆動テスト**を推奨
 
 ## AI との開発方針：TDD を活用する
 
@@ -96,8 +139,11 @@
 - **API 仕様**: ハンドラーに OpenAPI/Swagger アノテーションを記述して API を定義
 - **マイグレーション**: スキーマ変更時は必ず新しいマイグレーションファイルを作成（`make migrate-create`）
 
-## 固有の規約
+## コード規約
 
-- **Context**: I/O を行う関数には必ず第一引数として`context.Context`を渡す
-- **設定**: 環境変数から設定を読み込む（`internal/config`を使用）
-- **SQL**: PostgreSQL 用のプレースホルダー（`$1`、`$2`）または`sqlx`の名前付きクエリで生 SQL を記述する。動的な SQL 文字列の構築は避ける
+- I/O 関数は第一引数に`context.Context`
+- SQL プレースホルダーは`$1, $2`（PostgreSQL 形式）。動的な SQL 文字列の構築は避ける
+- 配列パラメータは`pq.Array()`を使用
+- ログは`zap`で構造化（`logger.With(zap.String(...))`）
+- エラーはコンテキストを付与してラップ: `fmt.Errorf("予約作成に失敗: %w", err)`
+- 設定は環境変数から読み込み（`internal/config`を使用）
