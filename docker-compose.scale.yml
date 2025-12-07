@@ -1,0 +1,132 @@
+# 水平スケーリングテスト用 Docker Compose 構成
+# 複数の API サーバーが共有の Redis/PostgreSQL に接続し、
+# 分散ロックが正しく機能することを実証します。
+#
+# 使用方法:
+#   docker compose -f docker-compose.scale.yml up --build
+#   k6 run -e BASE_URL=http://localhost:8080 loadtest/concurrent-100.js
+
+services:
+  # ロードバランサー（nginx）
+  nginx:
+    image: nginx:alpine
+    container_name: ticket_lb
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api-1
+      - api-2
+      - api-3
+    networks:
+      - ticket_network
+
+  # API サーバー 1
+  api-1:
+    build: .
+    container_name: ticket_api_1
+    environment:
+      PORT: "8080"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: ticket_reservation
+      DB_SSLMODE: disable
+      REDIS_ADDR: redis:6379
+      LOG_LEVEL: info
+      ENV: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ticket_network
+
+  # API サーバー 2
+  api-2:
+    build: .
+    container_name: ticket_api_2
+    environment:
+      PORT: "8080"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: ticket_reservation
+      DB_SSLMODE: disable
+      REDIS_ADDR: redis:6379
+      LOG_LEVEL: info
+      ENV: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ticket_network
+
+  # API サーバー 3
+  api-3:
+    build: .
+    container_name: ticket_api_3
+    environment:
+      PORT: "8080"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: ticket_reservation
+      DB_SSLMODE: disable
+      REDIS_ADDR: redis:6379
+      LOG_LEVEL: info
+      ENV: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ticket_network
+
+  # PostgreSQL（共有）
+  postgres:
+    image: postgres:16-alpine
+    container_name: ticket_postgres_scale
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ticket_reservation
+    volumes:
+      - postgres_scale_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ticket_network
+
+  # Redis（共有 - 分散ロック用）
+  redis:
+    image: redis:7-alpine
+    container_name: ticket_redis_scale
+    volumes:
+      - redis_scale_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ticket_network
+
+volumes:
+  postgres_scale_data:
+  redis_scale_data:
+
+networks:
+  ticket_network:
+    driver: bridge

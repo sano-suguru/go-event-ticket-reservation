@@ -76,6 +76,18 @@ k6 run loadtest/stress-simple.js
 CONCURRENT_USERS=100 k6 run loadtest/concurrent-100.js
 ```
 
+### 5. 水平スケーリングテスト
+
+3台のAPIサーバー構成で分散ロックの動作を確認。
+
+```bash
+# スケール構成を起動
+docker compose -f docker-compose.scale.yml up --build -d
+
+# テスト実行
+CONCURRENT_USERS=100 k6 run loadtest/concurrent-100.js
+```
+
 ## カスタムメトリクス
 
 | メトリクス | 説明 |

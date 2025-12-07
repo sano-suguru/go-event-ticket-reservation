@@ -706,6 +706,68 @@ gantt
 
 **結論**: 分散ロックと楽観的ロックにより、高負荷時も二重予約を完全に防止できています。
 
+### 水平スケーリングテスト（3台構成）
+
+**複数サーバー間でも分散ロックが正しく機能することを実証しました。**
+
+```mermaid
+flowchart TB
+    subgraph Client
+        K6[k6 負荷テスト<br/>100並行ユーザー]
+    end
+    
+    subgraph LoadBalancer
+        Nginx[nginx<br/>ラウンドロビン]
+    end
+    
+    subgraph APIServers[API サーバー群]
+        API1[api-1]
+        API2[api-2]
+        API3[api-3]
+    end
+    
+    subgraph SharedStorage[共有ストレージ]
+        Redis[(Redis<br/>分散ロック)]
+        PG[(PostgreSQL)]
+    end
+    
+    K6 --> Nginx
+    Nginx --> API1 & API2 & API3
+    API1 & API2 & API3 --> Redis
+    API1 & API2 & API3 --> PG
+    
+    style Redis fill:#fff3e0
+    style PG fill:#e3f2fd
+```
+
+**テスト構成:**
+```bash
+docker compose -f docker-compose.scale.yml up --build
+# nginx (LB) + api-1 + api-2 + api-3 + PostgreSQL + Redis
+```
+
+**テスト結果（100人同時予約）:**
+
+```
+█ THRESHOLDS 
+  reservation_success ✓ 'count==1' count=1
+  reservation_error   ✓ 'count==0' count=0
+
+█ TOTAL RESULTS 
+  reservation_success: 1   (1人のみ成功)
+  reservation_conflict: 99 (99人は競合で失敗)
+  reservation_error: 0     (エラーなし)
+```
+
+**nginx ログ（リクエスト分散確認）:**
+```
+172.18.0.4:8080 - POST /api/v1/reservations - 201  ← api-1 で成功
+172.18.0.5:8080 - POST /api/v1/reservations - 400  ← api-2 で競合
+172.18.0.6:8080 - POST /api/v1/reservations - 400  ← api-3 で競合
+```
+
+リクエストは3台のサーバーに分散されましたが、**Redis の分散ロックにより1人だけが予約に成功**しました。
+
 ---
 
 ## ⚡ キャッシュ戦略
