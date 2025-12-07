@@ -5,9 +5,9 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Demo](https://img.shields.io/badge/demo-Railway-blueviolet)](https://go-event-ticket-reservation-production.up.railway.app/swagger/index.html)
 
-高並行性イベントチケット予約システムのバックエンド API
+高並行環境でのデータ整合性を保証するイベントチケット予約システム
 
-**「同じ座席を2人に販売しない」** を確実に実現します。
+**「同じ座席を2人に販売しない」** を分散システムで確実に実現します。
 
 ---
 
@@ -61,7 +61,7 @@ flowchart TB
 
 | 層 | 役割 | 仕組み |
 |----|------|--------|
-| **分散ロック** | 同時アクセスを直列化 | Redis の SetNX で1人だけ通過 |
+| **分散ロック** | 複数サーバー間で同時アクセスを直列化 | Redis の SetNX で1人だけ通過 |
 | **楽観的ロック** | データ整合性を保証 | `WHERE status = 'available'` で更新 |
 | **冪等性キー** | 重複リクエストを防止 | 同じキーは既存結果を返す |
 
@@ -260,11 +260,13 @@ open http://localhost:8080/swagger/index.html
 
 ### 分散ロック（Redis）
 
+複数サーバーで動作する環境でも、Redis を共有することで排他制御を実現します。
+
 ```go
 // SetNX = "Set if Not eXists"
 ok, _ := client.SetNX(ctx, "lock:seat-A1", ownerID, 10*time.Second)
 if !ok {
-    return ErrLockNotAcquired  // 他の誰かがロック中
+    return ErrLockNotAcquired  // 他のサーバー/ユーザーがロック中
 }
 ```
 
@@ -294,6 +296,8 @@ if err == nil {
 
 README では触れていない以下の内容を詳しく解説しています：
 
+- **テスト戦略** - テストピラミッド（Unit / Scenario / E2E）の設計と実装
+- **負荷テスト詳細** - k6 シナリオの設定と実行方法
 - **構造化ログ** - zap による JSON ログ出力と監視連携
 - **Prometheus メトリクス** - カスタムメトリクスの定義と収集
 - **Redis キャッシュ戦略** - 空席数のキャッシュと無効化タイミング

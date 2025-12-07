@@ -176,9 +176,31 @@ flowchart LR
 
 ### 1. 分散ロック（Redis）
 
-**問題**: 2人が「ほぼ同時に」同じ座席を予約しようとしたら？
+**問題**: 複数のサーバーで動作するシステムで、2人が「ほぼ同時に」同じ座席を予約しようとしたら？
 
-**解決**: 最初の1人だけがロックを取得し、処理を続行できます。
+**解決**: Redis を使った分散ロックにより、**サーバーが複数台あっても**最初の1人だけがロックを取得できます。
+
+```mermaid
+flowchart TB
+    subgraph Servers[API サーバー群]
+        S1[Server 1]
+        S2[Server 2]
+        S3[Server 3]
+    end
+    
+    subgraph Shared[共有ストレージ]
+        Redis[(Redis<br/>分散ロック)]
+        DB[(PostgreSQL)]
+    end
+    
+    S1 & S2 & S3 -->|ロック取得| Redis
+    S1 & S2 & S3 --> DB
+    
+    style Redis fill:#fff3e0
+    style DB fill:#e3f2fd
+```
+
+**なぜ Redis が必要か**: 各サーバーのメモリ内ロック（`sync.Mutex`）では、他のサーバーのリクエストを制御できません。Redis を共有することで、全サーバー間で排他制御が可能になります。
 
 ```go
 // internal/infrastructure/redis/distributed_lock.go より
