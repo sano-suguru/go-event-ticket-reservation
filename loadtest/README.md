@@ -88,6 +88,29 @@ docker compose -f docker-compose.scale.yml up --build -d
 CONCURRENT_USERS=100 k6 run loadtest/concurrent-100.js
 ```
 
+### 6. 大規模データベンチマーク（Goテスト）
+
+10万座席のイベントでの性能を検証するGoベンチマークテスト。
+
+```bash
+# ベンチマーク実行（約2-3分）
+go test -v -run TestBenchmark_LargeScaleSeats ./internal/application/ -timeout 10m
+```
+
+**計測内容:**
+- 10万座席の一括作成（バルクINSERT）
+- 10万件に対する空席カウント
+- 1000人が異なる座席を同時予約
+- 100人が同じ座席を競合予約
+
+**実行結果:**
+| 操作 | 結果 |
+|------|------|
+| 座席作成 | 3.1秒（32,153席/秒） |
+| 空席カウント | 18.8ms |
+| 1000人同時予約 | 100%成功 |
+| 100人競合予約 | 1人成功、99人失敗 |
+
 ## カスタムメトリクス
 
 | メトリクス | 説明 |

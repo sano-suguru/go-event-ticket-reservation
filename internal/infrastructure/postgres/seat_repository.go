@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -48,10 +49,45 @@ func (r *SeatRepository) CreateBulk(ctx context.Context, seats []*seat.Seat) err
 	if len(seats) == 0 {
 		return nil
 	}
-	for _, s := range seats {
-		if err := r.Create(ctx, s); err != nil {
+
+	// バッチサイズごとに分割してマルチバリューINSERTを実行
+	const batchSize = 1000
+	for i := 0; i < len(seats); i += batchSize {
+		end := i + batchSize
+		if end > len(seats) {
+			end = len(seats)
+		}
+		batch := seats[i:end]
+
+		if err := r.createBulkBatch(ctx, batch); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// createBulkBatch はバッチ単位でマルチバリューINSERTを実行
+func (r *SeatRepository) createBulkBatch(ctx context.Context, seats []*seat.Seat) error {
+	if len(seats) == 0 {
+		return nil
+	}
+
+	// マルチバリューINSERTを構築
+	query := `INSERT INTO seats (event_id, seat_number, status, price, created_at, updated_at, version) VALUES `
+	args := make([]interface{}, 0, len(seats)*7)
+	placeholders := make([]string, 0, len(seats))
+
+	for i, s := range seats {
+		base := i * 7
+		placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d)",
+			base+1, base+2, base+3, base+4, base+5, base+6, base+7))
+		args = append(args, s.EventID, s.SeatNumber, string(s.Status), s.Price, s.CreatedAt, s.UpdatedAt, s.Version)
+	}
+
+	query += strings.Join(placeholders, ", ")
+	_, err := r.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("座席一括作成に失敗: %w", err)
 	}
 	return nil
 }

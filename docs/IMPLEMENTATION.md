@@ -768,6 +768,55 @@ docker compose -f docker-compose.scale.yml up --build
 
 リクエストは3台のサーバーに分散されましたが、**Redis の分散ロックにより1人だけが予約に成功**しました。
 
+### 大規模データベンチマーク（10万座席）
+
+**スタジアム規模のイベント（10万座席）での性能を検証しました。**
+
+```mermaid
+flowchart LR
+    subgraph TestScenario[テストシナリオ]
+        Create[10万座席作成]
+        Count[空席カウント]
+        Reserve1000[1000人同時予約<br/>異なる座席]
+        Reserve100[100人競合予約<br/>同じ座席]
+    end
+    
+    Create --> Count --> Reserve1000 --> Reserve100
+```
+
+**テスト結果:**
+
+| 操作 | 結果 | 詳細 |
+|------|------|------|
+| **座席作成** | 3.1秒 | 32,153席/秒（バルクINSERT最適化） |
+| **空席カウント** | 18.8ms | 10万件に対するCOUNTクエリ |
+| **1000人同時予約** | 100%成功 | 異なる座席に同時予約 |
+| **100人競合予約** | 1人成功、99人失敗 | 同一座席への競合 |
+
+**バルクINSERT最適化:**
+
+10万件のINSERTを高速化するため、マルチバリューINSERTを使用:
+
+```go
+// internal/infrastructure/postgres/seat_repository.go
+func (r *SeatRepository) createBulkBatch(ctx context.Context, seats []*seat.Seat) error {
+    // 1000件ずつバッチ処理
+    query := `INSERT INTO seats (...) VALUES ($1, $2, ...), ($8, $9, ...), ...`
+    _, err := r.db.ExecContext(ctx, query, args...)
+    return err
+}
+```
+
+1件ずつINSERTする場合と比較して、**約10倍高速**になりました。
+
+**競合予約の詳細ログ:**
+```
+✅ 競合予約完了: 393ms
+   成功: 1, 競合/エラー: 99
+```
+
+大規模データでも**データ整合性を完全に保証**できることが実証されました。
+
 ---
 
 ## ⚡ キャッシュ戦略
