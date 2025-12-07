@@ -410,7 +410,33 @@ func main() {
 
 ## 🧪 テスト結果
 
-### 同時予約テスト
+### テストカバレッジ
+
+本システムでは、テストピラミッドに基づいた3層のテストを実装しています。
+
+```mermaid
+graph TB
+    subgraph テストピラミッド
+        E2E[E2E テスト<br/>6テスト]
+        Scenario[シナリオテスト<br/>5シナリオ]
+        Unit[ユニットテスト<br/>多数]
+    end
+    
+    E2E --> Scenario
+    Scenario --> Unit
+    
+    style E2E fill:#ffcdd2
+    style Scenario fill:#fff9c4
+    style Unit fill:#c8e6c9
+```
+
+| レイヤー | テスト数 | 目的 |
+|---------|---------|------|
+| **E2E** | 6 | HTTPリクエスト/レスポンスの検証 |
+| **Scenario** | 5 | ビジネスフロー全体の検証 |
+| **Unit** | 多数 | ドメインロジックの検証 |
+
+### 同時予約テスト（単体テスト）
 
 10人が同時に同じ座席を予約しようとするテスト:
 
@@ -422,6 +448,50 @@ func main() {
 ```
 
 **結果**: 分散ロックと楽観的ロックにより、確実に1人だけが予約に成功。
+
+### シナリオテスト（統合テスト）
+
+実際のビジネスフローをシミュレートするシナリオテスト:
+
+| シナリオ | 内容 | 結果 |
+|---------|------|------|
+| 完全予約フロー | イベント作成→座席作成→予約→確定 | ✅ PASS |
+| 50ユーザー競合 | 50人が同じ座席を同時予約 | ✅ PASS（1人のみ成功） |
+| キャンセル再予約 | ユーザーAがキャンセル後、Bが予約成功 | ✅ PASS |
+| 複数座席予約 | 3座席を一括予約 | ✅ PASS |
+| 確定後不変性 | 確定済み予約のキャンセル拒否 | ✅ PASS |
+
+```
+=== RUN   TestScenario_FullReservationFlow
+--- PASS: TestScenario_FullReservationFlow (0.04s)
+=== RUN   TestScenario_50UserCompetition
+--- PASS: TestScenario_50UserCompetition (0.09s)
+    scenario_test.go:xxx: 成功: 1, 失敗: 49
+=== RUN   TestScenario_CancelAndRebook
+--- PASS: TestScenario_CancelAndRebook (0.02s)
+```
+
+### E2Eテスト（HTTPレベル）
+
+実際のHTTPリクエストを送信してAPIの動作を検証:
+
+| テスト | 内容 | 結果 |
+|--------|------|------|
+| HealthCheck | `/health` エンドポイント確認 | ✅ PASS |
+| CompleteReservationJourney | 予約の完全なライフサイクル | ✅ PASS |
+| ReservationConflict | 同一座席の競合検出 | ✅ PASS |
+| CancelAndRebook | キャンセル後の再予約 | ✅ PASS |
+| IdempotencyKey | 冪等性キーによる重複防止 | ✅ PASS |
+| EventCRUD | イベントのCRUD操作 | ✅ PASS |
+
+```
+=== RUN   TestE2E_CompleteReservationJourney
+=== RUN   TestE2E_CompleteReservationJourney/イベント作成
+=== RUN   TestE2E_CompleteReservationJourney/座席一括作成
+=== RUN   TestE2E_CompleteReservationJourney/予約作成
+=== RUN   TestE2E_CompleteReservationJourney/予約確定
+--- PASS: TestE2E_CompleteReservationJourney (0.05s)
+```
 
 ---
 
