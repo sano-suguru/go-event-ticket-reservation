@@ -113,11 +113,12 @@ func TestScenario_MultipleUsersCompeting(t *testing.T) {
 					SeatIDs:        []string{targetSeatID},
 					IdempotencyKey: "compete-" + time.Now().Format("20060102150405") + "-" + string(rune('A'+userNum%26)),
 				})
-				if err == nil {
+				switch err {
+				case nil:
 					atomic.AddInt32(&successCount, 1)
-				} else if err == seat.ErrSeatAlreadyReserved {
+				case seat.ErrSeatAlreadyReserved:
 					atomic.AddInt32(&conflictCount, 1)
-				} else {
+				default:
 					atomic.AddInt32(&otherErrorCount, 1)
 				}
 			}(i)

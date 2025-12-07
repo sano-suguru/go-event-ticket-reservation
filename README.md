@@ -5,9 +5,7 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Demo](https://img.shields.io/badge/demo-Railway-blueviolet)](https://go-event-ticket-reservation-production.up.railway.app/swagger/index.html)
 
-高並行環境でのデータ整合性を保証するイベントチケット予約システム
-
-**「同じ座席を2人に販売しない」** を分散システムで確実に実現します。
+大規模トラフィック（高負荷 / 高並行）・大量データでも二重予約ゼロを保証するイベントチケット予約システム
 
 ---
 
