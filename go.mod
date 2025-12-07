@@ -1,6 +1,6 @@
 module github.com/sanosuguru/go-event-ticket-reservation
 
-go 1.24.0
+go 1.24.11
 
 require (
 	github.com/golang-migrate/migrate/v4 v4.19.1
