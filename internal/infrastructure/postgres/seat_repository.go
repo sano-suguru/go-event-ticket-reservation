@@ -84,12 +84,27 @@ func (r *SeatRepository) createBulkBatch(ctx context.Context, seats []*seat.Seat
 		args = append(args, s.EventID, s.SeatNumber, string(s.Status), s.Price, s.CreatedAt, s.UpdatedAt, s.Version)
 	}
 
-	query += strings.Join(placeholders, ", ")
-	_, err := r.db.ExecContext(ctx, query, args...)
+	query += strings.Join(placeholders, ", ") + " RETURNING id"
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("座席一括作成に失敗: %w", err)
 	}
-	return nil
+	defer rows.Close()
+
+	// 生成されたIDを座席オブジェクトに設定
+	i := 0
+	for rows.Next() {
+		if i >= len(seats) {
+			break
+		}
+		if err := rows.Scan(&seats[i].ID); err != nil {
+			return fmt.Errorf("座席ID取得に失敗: %w", err)
+		}
+		i++
+	}
+
+	return rows.Err()
 }
 
 func (r *SeatRepository) GetByID(ctx context.Context, id string) (*seat.Seat, error) {

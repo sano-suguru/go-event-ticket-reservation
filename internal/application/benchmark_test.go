@@ -78,7 +78,7 @@ func TestBenchmark_LargeScaleSeats(t *testing.T) {
 
 		for batch := 0; batch < numBatches; batch++ {
 			prefix := fmt.Sprintf("SEC%02d", batch+1)
-			_, err := seatService.CreateBulkSeats(ctx, CreateBulkSeatsInput{
+			_, err = seatService.CreateBulkSeats(ctx, CreateBulkSeatsInput{
 				EventID: event.ID,
 				Prefix:  prefix,
 				Count:   batchSize,
