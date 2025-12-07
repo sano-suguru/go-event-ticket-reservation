@@ -24,6 +24,8 @@ jobs:
         with:
           version: latest
           args: --timeout=5m
+          # PR時は差分のみチェックして高速化
+          only-new-issues: ${{ github.event_name == 'pull_request' }}
 
   security:
     name: Security
