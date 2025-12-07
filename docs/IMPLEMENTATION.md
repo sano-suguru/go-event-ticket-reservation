@@ -659,7 +659,31 @@ gantt
   http_req_duration: avg=2.39ms p(95)=3.97ms
 ```
 
-### 本番シナリオ実行結果
+### ストレステスト結果（200 並行ユーザー）
+
+200 VU で2分間の混合ワークロード（読み取り80%、書き込み20%）を実行しました。
+
+```
+█ THRESHOLDS 
+  http_req_duration ✓ 'p(95)<1000' p(95)=40.23ms
+  http_req_duration ✓ 'p(99)<2000' p(99)=148.2ms
+  http_req_failed   ✓ 'rate<0.1' rate=0.00%
+
+█ TOTAL RESULTS 
+  checks_succeeded: 100.00% 171373 out of 171373
+  http_reqs: 171380 (1426.9 req/sec)
+  iteration_duration: avg=112.14ms med=107.2ms p(95)=170.59ms
+  vus_max: 200
+```
+
+| 指標 | 結果 | 評価 |
+|------|------|------|
+| スループット | 1,426 req/sec | 🔥 優秀 |
+| p95 レスポンス | 40.23 ms | ✅ 閾値1000msを大幅にクリア |
+| p99 レスポンス | 148.2 ms | ✅ 閾値2000msを大幅にクリア |
+| エラー率 | 0.00% | ✅ 完璧 |
+
+### 競合テスト結果（50人同時予約）
 
 50人が同時に同じ座席を予約する競合テストを実施しました。
 

@@ -54,6 +54,28 @@ k6 run loadtest/reservation.js
                               concurrent_reservation (50 VU)
 ```
 
+### 3. ストレステスト (`stress-simple.js`)
+
+200 並行ユーザーまでの高負荷テスト。混合ワークロード（読み取り80%、書き込み20%）。
+
+```bash
+k6 run loadtest/stress-simple.js
+```
+
+**負荷パターン:**
+```
+0s ──── 10s ──── 30s ──── 60s ──── 90s ──── 120s
+   50VU     100VU     100VU    200VU     200VU → 0
+```
+
+### 4. 競合テスト (`concurrent-100.js`)
+
+100人が同時に同じ座席を予約するテスト。
+
+```bash
+CONCURRENT_USERS=100 k6 run loadtest/concurrent-100.js
+```
+
 ## カスタムメトリクス
 
 | メトリクス | 説明 |
@@ -96,6 +118,26 @@ k6 run -e BASE_URL=https://api.example.com loadtest/reservation.js
 ```
 
 ## 期待される結果
+
+### ストレステスト（200 VU）
+
+```
+█ THRESHOLDS 
+  http_req_duration ✓ 'p(95)<1000' p(95)=40.23ms
+  http_req_duration ✓ 'p(99)<2000' p(99)=148.2ms
+  http_req_failed   ✓ 'rate<0.1' rate=0.00%
+
+█ TOTAL RESULTS 
+  http_reqs: 171380 (1426.9 req/sec)
+  vus_max: 200
+```
+
+| 指標 | 結果 |
+|------|------|
+| スループット | 1,426 req/sec |
+| p95 | 40.23 ms |
+| p99 | 148.2 ms |
+| エラー率 | 0.00% |
 
 ### 同時予約テスト
 
