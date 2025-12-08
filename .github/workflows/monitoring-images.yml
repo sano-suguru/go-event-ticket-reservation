@@ -4,9 +4,9 @@ on:
   push:
     branches: [main]
     paths:
-      - 'services/prometheus/**'
-      - 'services/grafana/**'
-      - '.github/workflows/monitoring-images.yml'
+      - "services/prometheus/**"
+      - "services/grafana/**"
+      - ".github/workflows/monitoring-images.yml"
   workflow_dispatch:
 
 env:
@@ -22,14 +22,14 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Log in to Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Build and push Prometheus
         uses: docker/build-push-action@v5
         with:
@@ -46,14 +46,14 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Log in to Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Build and push Grafana
         uses: docker/build-push-action@v5
         with:
