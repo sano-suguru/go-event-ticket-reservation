@@ -13,6 +13,13 @@ var (
 	ErrCacheMiss = errors.New("キャッシュが見つかりません")
 )
 
+// SeatCacheInterface は座席キャッシュのインターフェース
+type SeatCacheInterface interface {
+	GetAvailableCount(ctx context.Context, eventID string) (int, error)
+	SetAvailableCount(ctx context.Context, eventID string, count int, ttl time.Duration) error
+	Invalidate(ctx context.Context, eventID string) error
+}
+
 // SeatCache は座席情報のキャッシュを管理する
 type SeatCache struct {
 	client *redis.Client

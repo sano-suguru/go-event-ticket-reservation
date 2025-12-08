@@ -8,28 +8,28 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"go.uber.org/zap"
 
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/domain/event"
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/domain/reservation"
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/domain/seat"
-	redislock "github.com/sanosuguru/go-event-ticket-reservation/internal/infrastructure/redis"
+	"github.com/sanosuguru/go-event-ticket-reservation/internal/domain/transaction"
+	redisinfra "github.com/sanosuguru/go-event-ticket-reservation/internal/infrastructure/redis"
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/pkg/logger"
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/pkg/metrics"
 )
 
 type ReservationService struct {
-	db              *sqlx.DB
+	txManager       transaction.Manager
 	reservationRepo reservation.Repository
 	seatRepo        seat.Repository
 	eventRepo       event.Repository
-	lockManager     *redislock.LockManager
-	seatCache       *redislock.SeatCache
+	lockManager     redisinfra.LockManagerInterface
+	seatCache       redisinfra.SeatCacheInterface
 }
 
-func NewReservationService(db *sqlx.DB, rr reservation.Repository, sr seat.Repository, er event.Repository, lm *redislock.LockManager, cache *redislock.SeatCache) *ReservationService {
-	return &ReservationService{db: db, reservationRepo: rr, seatRepo: sr, eventRepo: er, lockManager: lm, seatCache: cache}
+func NewReservationService(txm transaction.Manager, rr reservation.Repository, sr seat.Repository, er event.Repository, lm redisinfra.LockManagerInterface, cache redisinfra.SeatCacheInterface) *ReservationService {
+	return &ReservationService{txManager: txm, reservationRepo: rr, seatRepo: sr, eventRepo: er, lockManager: lm, seatCache: cache}
 }
 
 type CreateReservationInput struct {
@@ -60,7 +60,7 @@ func (s *ReservationService) CreateReservation(ctx context.Context, input Create
 
 	// 分散ロックを取得（座席IDをソートしてデッドロックを防止）
 	lockKey := s.buildSeatLockKey(input.SeatIDs)
-	var lock *redislock.DistributedLock
+	var lock redisinfra.Lock
 	if s.lockManager != nil {
 		log.Debug("分散ロック取得中", zap.String("lock_key", lockKey))
 		lockStart := time.Now()
@@ -71,7 +71,7 @@ func (s *ReservationService) CreateReservation(ctx context.Context, input Create
 				m.DistributedLockDuration.WithLabelValues("acquire", "failed").Observe(lockDuration)
 				m.ReservationsTotal.WithLabelValues("lock_failed").Inc()
 			}
-			if errors.Is(err, redislock.ErrLockNotAcquired) {
+			if errors.Is(err, redisinfra.ErrLockNotAcquired) {
 				log.Warn("分散ロック取得失敗: 他のユーザーが処理中")
 				return nil, fmt.Errorf("座席が他のユーザーによって処理中です")
 			}
@@ -135,7 +135,7 @@ func (s *ReservationService) CreateReservation(ctx context.Context, input Create
 	}
 
 	// トランザクション
-	tx, err := s.db.BeginTxx(ctx, nil)
+	tx, err := s.txManager.Begin(ctx)
 	if err != nil {
 		log.Error("トランザクション開始に失敗", zap.Error(err))
 		return nil, fmt.Errorf("トランザクション開始に失敗: %w", err)
@@ -195,7 +195,7 @@ func (s *ReservationService) ConfirmReservation(ctx context.Context, id string) 
 	if confirmErr := res.Confirm(); confirmErr != nil {
 		return nil, confirmErr
 	}
-	tx, err := s.db.BeginTxx(ctx, nil)
+	tx, err := s.txManager.Begin(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("トランザクション開始に失敗: %w", err)
 	}
@@ -227,7 +227,7 @@ func (s *ReservationService) CancelReservation(ctx context.Context, id string) (
 	if cancelErr := res.Cancel(); cancelErr != nil {
 		return nil, cancelErr
 	}
-	tx, err := s.db.BeginTxx(ctx, nil)
+	tx, err := s.txManager.Begin(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("トランザクション開始に失敗: %w", err)
 	}
@@ -282,7 +282,7 @@ func (s *ReservationService) CancelExpiredReservations(ctx context.Context, expi
 			continue
 		}
 
-		tx, err := s.db.BeginTxx(ctx, nil)
+		tx, err := s.txManager.Begin(ctx)
 		if err != nil {
 			log.Error("トランザクション開始に失敗", zap.Error(err))
 			continue

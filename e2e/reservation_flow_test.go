@@ -49,10 +49,11 @@ func NewTestServer(t *testing.T) *TestServer {
 	eventRepo := postgres.NewEventRepository(db)
 	seatRepo := postgres.NewSeatRepository(db)
 	reservationRepo := postgres.NewReservationRepository(db)
+	txManager := postgres.NewTxManager(db)
 
 	eventService := application.NewEventService(eventRepo)
-	seatService := application.NewSeatService(db, seatRepo, eventRepo, seatCache)
-	reservationService := application.NewReservationService(db, reservationRepo, seatRepo, eventRepo, lockManager, seatCache)
+	seatService := application.NewSeatService(seatRepo, eventRepo, seatCache)
+	reservationService := application.NewReservationService(txManager, reservationRepo, seatRepo, eventRepo, lockManager, seatCache)
 
 	eventHandler := handler.NewEventHandler(eventService)
 	seatHandler := handler.NewSeatHandler(seatService)

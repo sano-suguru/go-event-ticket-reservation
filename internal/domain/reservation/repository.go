@@ -4,13 +4,13 @@ import (
 	"context"
 	"time"
 
-	"github.com/jmoiron/sqlx"
+	"github.com/sanosuguru/go-event-ticket-reservation/internal/domain/transaction"
 )
 
 // Repository は予約リポジトリのインターフェース
 type Repository interface {
 	// Create は新しい予約を作成する（トランザクション必須）
-	Create(ctx context.Context, tx *sqlx.Tx, reservation *Reservation) error
+	Create(ctx context.Context, tx transaction.Tx, reservation *Reservation) error
 
 	// GetByID はIDから予約を取得する
 	GetByID(ctx context.Context, id string) (*Reservation, error)
@@ -22,7 +22,7 @@ type Repository interface {
 	GetByUserID(ctx context.Context, userID string, limit, offset int) ([]*Reservation, error)
 
 	// Update は予約を更新する（トランザクション必須）
-	Update(ctx context.Context, tx *sqlx.Tx, reservation *Reservation) error
+	Update(ctx context.Context, tx transaction.Tx, reservation *Reservation) error
 
 	// GetExpiredPending は期限切れの保留中予約を取得する
 	GetExpiredPending(ctx context.Context, expireAfter time.Duration) ([]*Reservation, error)

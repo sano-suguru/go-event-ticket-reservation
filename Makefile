@@ -24,6 +24,11 @@ test-coverage:
 	go test -v -race -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out -o coverage.html
 
+# 統合テスト（Docker環境が必要）
+test-integration:
+	@echo "==> 統合テストを実行しています（Docker環境が必要）..."
+	go test -v -race -tags=integration -cover ./...
+
 # Lint
 lint:
 	@echo "==> Lintを実行しています..."
@@ -82,17 +87,18 @@ install-tools:
 # ヘルプ
 help:
 	@echo "利用可能なコマンド:"
-	@echo "  make build          - アプリケーションをビルド"
-	@echo "  make run            - アプリケーションを起動"
-	@echo "  make test           - テストを実行"
-	@echo "  make test-coverage  - カバレッジ付きテストを実行"
-	@echo "  make lint           - Lintを実行"
-	@echo "  make tidy           - 依存関係を整理"
-	@echo "  make clean          - ビルド成果物を削除"
-	@echo "  make docker-up      - Dockerコンテナを起動"
-	@echo "  make docker-down    - Dockerコンテナを停止"
-	@echo "  make docker-logs    - Dockerログを表示"
-	@echo "  make migrate-up     - マイグレーションを適用"
-	@echo "  make migrate-down   - マイグレーションをロールバック"
-	@echo "  make migrate-create - マイグレーションファイルを作成"
-	@echo "  make install-tools  - 開発ツールをインストール"
+	@echo "  make build            - アプリケーションをビルド"
+	@echo "  make run              - アプリケーションを起動"
+	@echo "  make test             - ユニットテストを実行"
+	@echo "  make test-coverage    - カバレッジ付きテストを実行"
+	@echo "  make test-integration - 統合テストを実行（Docker環境が必要）"
+	@echo "  make lint             - Lintを実行"
+	@echo "  make tidy             - 依存関係を整理"
+	@echo "  make clean            - ビルド成果物を削除"
+	@echo "  make docker-up        - Dockerコンテナを起動"
+	@echo "  make docker-down      - Dockerコンテナを停止"
+	@echo "  make docker-logs      - Dockerログを表示"
+	@echo "  make migrate-up       - マイグレーションを適用"
+	@echo "  make migrate-down     - マイグレーションをロールバック"
+	@echo "  make migrate-create   - マイグレーションファイルを作成"
+	@echo "  make install-tools    - 開発ツールをインストール"

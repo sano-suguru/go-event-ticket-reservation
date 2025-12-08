@@ -6,13 +6,17 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/sanosuguru/go-event-ticket-reservation/internal/application"
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/pkg/logger"
 )
 
+// ReservationCleaner は期限切れ予約をキャンセルするインターフェース
+type ReservationCleaner interface {
+	CancelExpiredReservations(ctx context.Context, expireAfter time.Duration) (int, error)
+}
+
 // ExpiredReservationCleaner は期限切れ予約をクリーンアップするワーカー
 type ExpiredReservationCleaner struct {
-	reservationService *application.ReservationService
+	reservationService ReservationCleaner
 	interval           time.Duration
 	expireAfter        time.Duration
 	stopCh             chan struct{}
@@ -21,7 +25,7 @@ type ExpiredReservationCleaner struct {
 
 // NewExpiredReservationCleaner は新しいクリーナーを作成
 func NewExpiredReservationCleaner(
-	rs *application.ReservationService,
+	rs ReservationCleaner,
 	interval time.Duration,
 	expireAfter time.Duration,
 ) *ExpiredReservationCleaner {

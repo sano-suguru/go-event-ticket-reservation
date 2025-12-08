@@ -11,6 +11,7 @@ import (
 	"github.com/lib/pq"
 
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/domain/reservation"
+	"github.com/sanosuguru/go-event-ticket-reservation/internal/domain/transaction"
 )
 
 type reservationRow struct {
@@ -32,9 +33,13 @@ func NewReservationRepository(db *sqlx.DB) *ReservationRepository {
 	return &ReservationRepository{db: db}
 }
 
-func (r *ReservationRepository) Create(ctx context.Context, tx *sqlx.Tx, res *reservation.Reservation) error {
+func (r *ReservationRepository) Create(ctx context.Context, tx transaction.Tx, res *reservation.Reservation) error {
+	sqlxTx := UnwrapTx(tx)
+	if sqlxTx == nil {
+		return fmt.Errorf("無効なトランザクション")
+	}
 	query := `INSERT INTO reservations (event_id, user_id, status, idempotency_key, total_amount, expires_at, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`
-	if err := tx.QueryRowContext(ctx, query, res.EventID, res.UserID, string(res.Status), res.IdempotencyKey, res.TotalAmount, res.ExpiresAt, res.CreatedAt, res.UpdatedAt).Scan(&res.ID); err != nil {
+	if err := sqlxTx.QueryRowContext(ctx, query, res.EventID, res.UserID, string(res.Status), res.IdempotencyKey, res.TotalAmount, res.ExpiresAt, res.CreatedAt, res.UpdatedAt).Scan(&res.ID); err != nil {
 		if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
 			return reservation.ErrIdempotencyKeyAlreadyExists
 		}
@@ -42,7 +47,7 @@ func (r *ReservationRepository) Create(ctx context.Context, tx *sqlx.Tx, res *re
 	}
 	if len(res.SeatIDs) > 0 {
 		for _, seatID := range res.SeatIDs {
-			if _, err := tx.ExecContext(ctx, `INSERT INTO reservation_seats (reservation_id, seat_id) VALUES ($1, $2)`, res.ID, seatID); err != nil {
+			if _, err := sqlxTx.ExecContext(ctx, `INSERT INTO reservation_seats (reservation_id, seat_id) VALUES ($1, $2)`, res.ID, seatID); err != nil {
 				return fmt.Errorf("予約座席関連付けに失敗: %w", err)
 			}
 		}
@@ -97,9 +102,13 @@ func (r *ReservationRepository) GetByUserID(ctx context.Context, userID string, 
 	return result, nil
 }
 
-func (r *ReservationRepository) Update(ctx context.Context, tx *sqlx.Tx, res *reservation.Reservation) error {
+func (r *ReservationRepository) Update(ctx context.Context, tx transaction.Tx, res *reservation.Reservation) error {
+	sqlxTx := UnwrapTx(tx)
+	if sqlxTx == nil {
+		return fmt.Errorf("無効なトランザクション")
+	}
 	query := `UPDATE reservations SET status = $1, confirmed_at = $2, updated_at = $3 WHERE id = $4`
-	result, err := tx.ExecContext(ctx, query, string(res.Status), res.ConfirmedAt, res.UpdatedAt, res.ID)
+	result, err := sqlxTx.ExecContext(ctx, query, string(res.Status), res.ConfirmedAt, res.UpdatedAt, res.ID)
 	if err != nil {
 		return fmt.Errorf("予約更新に失敗: %w", err)
 	}

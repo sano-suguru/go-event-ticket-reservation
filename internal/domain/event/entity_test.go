@@ -102,3 +102,87 @@ func TestEvent_Validate(t *testing.T) {
 		})
 	}
 }
+
+func TestEvent_IsBookingOpen(t *testing.T) {
+	tests := []struct {
+		name     string
+		startAt  time.Time
+		expected bool
+	}{
+		{
+			name:     "未来のイベント - 予約受付中",
+			startAt:  time.Now().Add(24 * time.Hour),
+			expected: true,
+		},
+		{
+			name:     "過去のイベント - 予約受付終了",
+			startAt:  time.Now().Add(-1 * time.Hour),
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			event := &Event{
+				StartAt: tt.startAt,
+			}
+			assert.Equal(t, tt.expected, event.IsBookingOpen())
+		})
+	}
+}
+
+func TestEvent_HasStarted(t *testing.T) {
+	tests := []struct {
+		name     string
+		startAt  time.Time
+		expected bool
+	}{
+		{
+			name:     "過去の開始時刻 - 開始済み",
+			startAt:  time.Now().Add(-1 * time.Hour),
+			expected: true,
+		},
+		{
+			name:     "未来の開始時刻 - 未開始",
+			startAt:  time.Now().Add(1 * time.Hour),
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			event := &Event{
+				StartAt: tt.startAt,
+			}
+			assert.Equal(t, tt.expected, event.HasStarted())
+		})
+	}
+}
+
+func TestEvent_HasEnded(t *testing.T) {
+	tests := []struct {
+		name     string
+		endAt    time.Time
+		expected bool
+	}{
+		{
+			name:     "過去の終了時刻 - 終了済み",
+			endAt:    time.Now().Add(-1 * time.Hour),
+			expected: true,
+		},
+		{
+			name:     "未来の終了時刻 - 未終了",
+			endAt:    time.Now().Add(1 * time.Hour),
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			event := &Event{
+				EndAt: tt.endAt,
+			}
+			assert.Equal(t, tt.expected, event.HasEnded())
+		})
+	}
+}

@@ -61,4 +61,31 @@ func TestLockManager_AcquireLock(t *testing.T) {
 		require.NoError(t, err)
 		defer lock2.Release(ctx)
 	})
+
+	t.Run("ロックを延長できる", func(t *testing.T) {
+		lock, err := manager.AcquireLock(ctx, "test-key-extend", 1*time.Second)
+		require.NoError(t, err)
+		defer lock.Release(ctx)
+
+		// ロックを延長
+		err = lock.Extend(ctx, 5*time.Second)
+		require.NoError(t, err)
+
+		// まだロックを持っていることを確認
+		lock2, err := manager.AcquireLock(ctx, "test-key-extend", 1*time.Second)
+		assert.ErrorIs(t, err, ErrLockNotAcquired)
+		assert.Nil(t, lock2)
+	})
+
+	t.Run("解放後は延長できない", func(t *testing.T) {
+		lock, err := manager.AcquireLock(ctx, "test-key-extend-after-release", 1*time.Second)
+		require.NoError(t, err)
+
+		err = lock.Release(ctx)
+		require.NoError(t, err)
+
+		// 解放後に延長を試みる
+		err = lock.Extend(ctx, 5*time.Second)
+		assert.ErrorIs(t, err, ErrLockNotOwned)
+	})
 }

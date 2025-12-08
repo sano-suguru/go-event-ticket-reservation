@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"go.uber.org/zap"
 
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/domain/event"
@@ -20,14 +19,13 @@ const (
 )
 
 type SeatService struct {
-	db        *sqlx.DB
 	seatRepo  seat.Repository
 	eventRepo event.Repository
-	cache     *redisinfra.SeatCache
+	cache     redisinfra.SeatCacheInterface
 }
 
-func NewSeatService(db *sqlx.DB, sr seat.Repository, er event.Repository, cache *redisinfra.SeatCache) *SeatService {
-	return &SeatService{db: db, seatRepo: sr, eventRepo: er, cache: cache}
+func NewSeatService(sr seat.Repository, er event.Repository, cache redisinfra.SeatCacheInterface) *SeatService {
+	return &SeatService{seatRepo: sr, eventRepo: er, cache: cache}
 }
 
 type CreateSeatInput struct {

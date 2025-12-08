@@ -12,10 +12,10 @@ import (
 )
 
 type EventHandler struct {
-	eventService *application.EventService
+	eventService EventServiceInterface
 }
 
-func NewEventHandler(eventService *application.EventService) *EventHandler {
+func NewEventHandler(eventService EventServiceInterface) *EventHandler {
 	return &EventHandler{eventService: eventService}
 }
 

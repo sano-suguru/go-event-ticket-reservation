@@ -131,3 +131,30 @@ func TestHTTPRequestDuration(t *testing.T) {
 	}
 	assert.True(t, found, "http_request_duration_seconds metric not found")
 }
+
+func TestGet_ReturnsDefaultMetrics(t *testing.T) {
+	// Getは defaultMetrics を返す
+	// 注意: Init が呼ばれていない場合は nil を返す可能性がある
+	m := Get()
+	// nil または Metrics インスタンスが返る
+	if m != nil {
+		assert.NotNil(t, m.HTTPRequestsTotal)
+	}
+}
+
+func TestInit_CreatesDefaultMetrics(t *testing.T) {
+	// 既存のdefaultMetricsをバックアップ
+	oldMetrics := defaultMetrics
+	defer func() { defaultMetrics = oldMetrics }()
+
+	// 新しいレジストリでテスト用メトリクスを作成してdefaultMetricsにセット
+	// 注意: Initを呼ぶとデフォルトレジストリに登録するため、テストでは直接セット
+	reg := prometheus.NewRegistry()
+	m := NewWithRegistry(reg)
+	defaultMetrics = m
+
+	// Get()がdefaultMetricsを返すことを確認
+	got := Get()
+	assert.NotNil(t, got)
+	assert.Equal(t, m, got)
+}

@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 package application
 
 import (
@@ -35,10 +38,11 @@ func setupTestEnv(t *testing.T) (*ReservationService, *SeatService, *EventServic
 	eventRepo := postgres.NewEventRepository(db)
 	seatRepo := postgres.NewSeatRepository(db)
 	reservationRepo := postgres.NewReservationRepository(db)
+	txManager := postgres.NewTxManager(db)
 
 	eventService := NewEventService(eventRepo)
 	seatService := NewSeatService(db, seatRepo, eventRepo, nil)
-	reservationService := NewReservationService(db, reservationRepo, seatRepo, eventRepo, lockManager, nil)
+	reservationService := NewReservationService(txManager, reservationRepo, seatRepo, eventRepo, lockManager, nil)
 
 	cleanup := func() {
 		db.Exec("DELETE FROM reservation_seats")

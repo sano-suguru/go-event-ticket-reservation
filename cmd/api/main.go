@@ -92,10 +92,13 @@ func main() {
 	seatRepo := postgres.NewSeatRepository(db)
 	reservationRepo := postgres.NewReservationRepository(db)
 
+	// Transaction Manager
+	txManager := postgres.NewTxManager(db)
+
 	// Services
 	eventService := application.NewEventService(eventRepo)
-	seatService := application.NewSeatService(db, seatRepo, eventRepo, seatCache)
-	reservationService := application.NewReservationService(db, reservationRepo, seatRepo, eventRepo, lockManager, seatCache)
+	seatService := application.NewSeatService(seatRepo, eventRepo, seatCache)
+	reservationService := application.NewReservationService(txManager, reservationRepo, seatRepo, eventRepo, lockManager, seatCache)
 
 	// Handlers
 	eventHandler := handler.NewEventHandler(eventService)

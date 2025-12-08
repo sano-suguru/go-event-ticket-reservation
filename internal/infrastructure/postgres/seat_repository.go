@@ -12,6 +12,7 @@ import (
 	"github.com/lib/pq"
 
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/domain/seat"
+	"github.com/sanosuguru/go-event-ticket-reservation/internal/domain/transaction"
 )
 
 type seatRow struct {
@@ -145,12 +146,16 @@ func (r *SeatRepository) GetAvailableByEventID(ctx context.Context, eventID stri
 	return seats, nil
 }
 
-func (r *SeatRepository) ReserveSeats(ctx context.Context, tx *sqlx.Tx, seatIDs []string, reservationID string) error {
+func (r *SeatRepository) ReserveSeats(ctx context.Context, tx transaction.Tx, seatIDs []string, reservationID string) error {
 	if len(seatIDs) == 0 {
 		return nil
 	}
+	sqlxTx := UnwrapTx(tx)
+	if sqlxTx == nil {
+		return fmt.Errorf("無効なトランザクション")
+	}
 	query := `UPDATE seats SET status = 'reserved', reserved_by = $1, reserved_at = NOW(), updated_at = NOW(), version = version + 1 WHERE id = ANY($2) AND status = 'available'`
-	result, err := tx.ExecContext(ctx, query, reservationID, pq.Array(seatIDs))
+	result, err := sqlxTx.ExecContext(ctx, query, reservationID, pq.Array(seatIDs))
 	if err != nil {
 		return fmt.Errorf("座席予約に失敗: %w", err)
 	}
@@ -161,12 +166,16 @@ func (r *SeatRepository) ReserveSeats(ctx context.Context, tx *sqlx.Tx, seatIDs 
 	return nil
 }
 
-func (r *SeatRepository) ConfirmSeats(ctx context.Context, tx *sqlx.Tx, seatIDs []string) error {
+func (r *SeatRepository) ConfirmSeats(ctx context.Context, tx transaction.Tx, seatIDs []string) error {
 	if len(seatIDs) == 0 {
 		return nil
 	}
+	sqlxTx := UnwrapTx(tx)
+	if sqlxTx == nil {
+		return fmt.Errorf("無効なトランザクション")
+	}
 	query := `UPDATE seats SET status = 'confirmed', updated_at = NOW(), version = version + 1 WHERE id = ANY($1) AND status = 'reserved'`
-	result, err := tx.ExecContext(ctx, query, pq.Array(seatIDs))
+	result, err := sqlxTx.ExecContext(ctx, query, pq.Array(seatIDs))
 	if err != nil {
 		return fmt.Errorf("座席確定に失敗: %w", err)
 	}
@@ -177,12 +186,16 @@ func (r *SeatRepository) ConfirmSeats(ctx context.Context, tx *sqlx.Tx, seatIDs 
 	return nil
 }
 
-func (r *SeatRepository) ReleaseSeats(ctx context.Context, tx *sqlx.Tx, seatIDs []string) error {
+func (r *SeatRepository) ReleaseSeats(ctx context.Context, tx transaction.Tx, seatIDs []string) error {
 	if len(seatIDs) == 0 {
 		return nil
 	}
+	sqlxTx := UnwrapTx(tx)
+	if sqlxTx == nil {
+		return fmt.Errorf("無効なトランザクション")
+	}
 	query := `UPDATE seats SET status = 'available', reserved_by = NULL, reserved_at = NULL, updated_at = NOW(), version = version + 1 WHERE id = ANY($1)`
-	_, err := tx.ExecContext(ctx, query, pq.Array(seatIDs))
+	_, err := sqlxTx.ExecContext(ctx, query, pq.Array(seatIDs))
 	return err
 }
 

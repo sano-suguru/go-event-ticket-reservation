@@ -15,6 +15,18 @@ var (
 	ErrLockNotOwned    = errors.New("ロックの所有者ではありません")
 )
 
+// Lock は分散ロックのインターフェース
+type Lock interface {
+	Release(ctx context.Context) error
+	Extend(ctx context.Context, ttl time.Duration) error
+}
+
+// LockManagerInterface は分散ロックマネージャーのインターフェース
+type LockManagerInterface interface {
+	AcquireLock(ctx context.Context, key string, ttl time.Duration) (Lock, error)
+	AcquireLockWithRetry(ctx context.Context, key string, ttl time.Duration, maxRetries int, retryDelay time.Duration) (Lock, error)
+}
+
 // DistributedLock は Redis を使用した分散ロック
 type DistributedLock struct {
 	client *redis.Client
@@ -33,7 +45,7 @@ func NewLockManager(client *redis.Client) *LockManager {
 }
 
 // AcquireLock はロックを取得する
-func (m *LockManager) AcquireLock(ctx context.Context, key string, ttl time.Duration) (*DistributedLock, error) {
+func (m *LockManager) AcquireLock(ctx context.Context, key string, ttl time.Duration) (Lock, error) {
 	lockKey := fmt.Sprintf("lock:%s", key)
 	lockValue := uuid.New().String()
 
@@ -55,7 +67,7 @@ func (m *LockManager) AcquireLock(ctx context.Context, key string, ttl time.Dura
 }
 
 // AcquireLockWithRetry はリトライ付きでロックを取得する
-func (m *LockManager) AcquireLockWithRetry(ctx context.Context, key string, ttl time.Duration, maxRetries int, retryDelay time.Duration) (*DistributedLock, error) {
+func (m *LockManager) AcquireLockWithRetry(ctx context.Context, key string, ttl time.Duration, maxRetries int, retryDelay time.Duration) (Lock, error) {
 	var lastErr error
 	for i := 0; i < maxRetries; i++ {
 		lock, err := m.AcquireLock(ctx, key, ttl)

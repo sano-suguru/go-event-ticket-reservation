@@ -13,10 +13,10 @@ import (
 )
 
 type ReservationHandler struct {
-	service *application.ReservationService
+	service ReservationServiceInterface
 }
 
-func NewReservationHandler(s *application.ReservationService) *ReservationHandler {
+func NewReservationHandler(s ReservationServiceInterface) *ReservationHandler {
 	return &ReservationHandler{service: s}
 }
 
