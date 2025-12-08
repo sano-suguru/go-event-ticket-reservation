@@ -1,0 +1,16 @@
+FROM grafana/grafana:10.2.0
+
+# 環境変数で設定
+ENV GF_SECURITY_ADMIN_USER=admin
+ENV GF_SECURITY_ADMIN_PASSWORD=admin
+ENV GF_USERS_ALLOW_SIGN_UP=false
+ENV GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-http://localhost:3000}
+
+# データソース設定（ビルドコンテキストは monitoring/ ディレクトリ）
+COPY railway/provisioning/datasources/datasources.yml /etc/grafana/provisioning/datasources/
+COPY railway/provisioning/dashboards/dashboards.yml /etc/grafana/provisioning/dashboards/
+
+# ダッシュボードは共通ディレクトリから
+COPY grafana/dashboards/ /var/lib/grafana/dashboards/
+
+

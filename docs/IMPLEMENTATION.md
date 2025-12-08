@@ -533,15 +533,91 @@ graph TB
 
 ---
 
-## Prometheusメトリクス
+## 監視（Grafana + Prometheus）
 
-### エンドポイント
+### ローカル環境
 
 ```bash
-curl http://localhost:8081/metrics
+# 監視スタック（Prometheus + Grafana）を起動
+make monitoring-up
+
+# APIサーバーを起動
+make run
+
+# Grafana にアクセス
+open http://localhost:3000
+# ログイン: admin / admin
 ```
 
-### 収集メトリクス
+| サービス | URL | 説明 |
+|---------|-----|------|
+| Grafana | http://localhost:3000 | ダッシュボード |
+| Prometheus | http://localhost:9090 | メトリクス収集 |
+| メトリクス | http://localhost:8080/metrics | アプリケーションメトリクス |
+
+### 本番環境（Grafana Cloud）
+
+本番環境では [Grafana Cloud](https://grafana.com/products/cloud/) を使用してメトリクスを収集します。無料プランで十分な機能が利用可能です。
+
+#### 1. Railway に環境変数を設定
+
+`/metrics` エンドポイントは Basic 認証で保護されています。
+
+```bash
+# Railway CLI でシークレットを設定
+railway variables set METRICS_USER=grafana
+railway variables set METRICS_PASSWORD=$(openssl rand -base64 32)
+
+# 設定した値を確認（Grafana Cloud 設定時に必要）
+railway variables
+```
+
+#### 2. Grafana Cloud でスクレイプジョブを設定
+
+1. [Grafana Cloud](https://grafana.com/auth/sign-up/create-user) で無料アカウント作成
+2. **Connections** → **Hosted Prometheus metrics** → **Scrape a metrics endpoint** を選択
+3. スクレイプジョブを設定:
+   - **Job name**: `ticket-api`
+   - **URL**: `https://go-event-ticket-reservation-production.up.railway.app/metrics`
+   - **Authentication**: Basic認証（Railway に設定した METRICS_USER/PASSWORD）
+   - **Scrape Interval**: 60秒（無料プランの推奨値）
+
+#### 3. ダッシュボードをインポート
+
+1. **Dashboards** → **Import** を選択
+2. `monitoring/grafana/dashboards/ticket-reservation.json` をアップロード
+3. データソースを Grafana Cloud の Prometheus に変更
+
+### ダッシュボードパネル
+
+事前設定されたダッシュボード（`ticket-reservation.json`）には以下のパネルが含まれています：
+
+| パネル | 説明 |
+|--------|------|
+| Request Rate | 秒間リクエスト数 |
+| p95 Latency | 95パーセンタイルレイテンシ |
+| Endpoint Breakdown | エンドポイント別リクエスト分布 |
+| Latency Distribution | レイテンシヒストグラム |
+| Reservation Outcome | 予約結果（成功/競合/エラー）の割合 |
+| Reservation Rate | 予約結果の時系列推移 |
+| Pending Reservations | 仮予約数（15分で期限切れ） |
+| Confirmed Reservations | 確定済み予約数 |
+| Distributed Lock Duration | 分散ロック操作時間 |
+| HTTP Status Codes | HTTPステータスコード分布 |
+
+### Prometheusメトリクス
+
+#### エンドポイント
+
+```bash
+# ローカル（認証なし）
+curl http://localhost:8080/metrics
+
+# 本番（Basic認証必須）
+curl -u "$METRICS_USER:$METRICS_PASSWORD" https://your-app.railway.app/metrics
+```
+
+#### 収集メトリクス
 
 | メトリクス | 種類 | 説明 |
 |-----------|------|------|

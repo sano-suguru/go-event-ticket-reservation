@@ -1,0 +1,44 @@
+# Prometheus 設定ファイル
+global:
+  scrape_interval: 15s # メトリクス収集間隔
+  evaluation_interval: 15s # ルール評価間隔
+
+# Alertmanager設定（将来用）
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# スクレイプ設定
+scrape_configs:
+  # Prometheus自身のメトリクス
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # API サーバー（単体構成）
+  - job_name: "ticket-api"
+    static_configs:
+      - targets: ["host.docker.internal:8080"]
+    metrics_path: "/metrics"
+    scrape_interval: 5s
+
+  # API サーバー（スケール構成用）
+  - job_name: "ticket-api-scaled"
+    static_configs:
+      - targets:
+          - "api-1:8080"
+          - "api-2:8080"
+          - "api-3:8080"
+    metrics_path: "/metrics"
+    scrape_interval: 5s
+
+  # Redis メトリクス（redis_exporter経由）
+  - job_name: "redis"
+    static_configs:
+      - targets: ["redis-exporter:9121"]
+
+  # PostgreSQL メトリクス（postgres_exporter経由）
+  - job_name: "postgres"
+    static_configs:
+      - targets: ["postgres-exporter:9187"]

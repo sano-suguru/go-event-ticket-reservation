@@ -1,0 +1,13 @@
+# Grafana ダッシュボード自動プロビジョニング
+apiVersion: 1
+
+providers:
+  - name: "default"
+    orgId: 1
+    folder: ""
+    folderUid: ""
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards

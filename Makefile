@@ -1,4 +1,4 @@
-.PHONY: all build run test lint clean docker-up docker-down migrate-up migrate-down migrate-create help
+.PHONY: all build run test lint clean docker-up docker-down migrate-up migrate-down migrate-create monitoring-up monitoring-down monitoring-logs help
 
 # デフォルトタスク
 all: lint test build
@@ -84,6 +84,19 @@ install-tools:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 
+# 監視スタック（Prometheus + Grafana）
+monitoring-up:
+	@echo "==> 監視スタックを起動しています..."
+	docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+
+monitoring-down:
+	@echo "==> 監視スタックを停止しています..."
+	docker compose -f docker-compose.yml -f docker-compose.monitoring.yml down
+
+monitoring-logs:
+	@echo "==> 監視スタックのログを表示しています..."
+	docker compose -f docker-compose.yml -f docker-compose.monitoring.yml logs -f prometheus grafana
+
 # ヘルプ
 help:
 	@echo "利用可能なコマンド:"
@@ -98,6 +111,9 @@ help:
 	@echo "  make docker-up        - Dockerコンテナを起動"
 	@echo "  make docker-down      - Dockerコンテナを停止"
 	@echo "  make docker-logs      - Dockerログを表示"
+	@echo "  make monitoring-up    - 監視スタック（Prometheus+Grafana）を起動"
+	@echo "  make monitoring-down  - 監視スタックを停止"
+	@echo "  make monitoring-logs  - 監視スタックのログを表示"
 	@echo "  make migrate-up       - マイグレーションを適用"
 	@echo "  make migrate-down     - マイグレーションをロールバック"
 	@echo "  make migrate-create   - マイグレーションファイルを作成"
