@@ -1,6 +1,6 @@
 # バイナリ
 bin/
-api
+/api
 server
 *.exe
 *.exe~
