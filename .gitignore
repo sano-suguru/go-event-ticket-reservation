@@ -36,3 +36,6 @@ Thumbs.db
 # 一時ファイル
 tmp/
 temp/
+
+# 内部用ドキュメント（個人用メモ）
+docs/PROJECT_PLAN.md
