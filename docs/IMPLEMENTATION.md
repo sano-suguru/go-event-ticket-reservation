@@ -551,42 +551,9 @@ open http://localhost:3000
 
 | サービス | URL | 説明 |
 |---------|-----|------|
-| Grafana | http://localhost:3000 | ダッシュボード |
+| Grafana | http://localhost:3001 | ダッシュボード（admin/admin） |
 | Prometheus | http://localhost:9090 | メトリクス収集 |
 | メトリクス | http://localhost:8080/metrics | アプリケーションメトリクス |
-
-### 本番環境（Grafana Cloud）
-
-本番環境では [Grafana Cloud](https://grafana.com/products/cloud/) を使用してメトリクスを収集します。無料プランで十分な機能が利用可能です。
-
-#### 1. Railway に環境変数を設定
-
-`/metrics` エンドポイントは Basic 認証で保護されています。
-
-```bash
-# Railway CLI でシークレットを設定
-railway variables set METRICS_USER=grafana
-railway variables set METRICS_PASSWORD=$(openssl rand -base64 32)
-
-# 設定した値を確認（Grafana Cloud 設定時に必要）
-railway variables
-```
-
-#### 2. Grafana Cloud でスクレイプジョブを設定
-
-1. [Grafana Cloud](https://grafana.com/auth/sign-up/create-user) で無料アカウント作成
-2. **Connections** → **Hosted Prometheus metrics** → **Scrape a metrics endpoint** を選択
-3. スクレイプジョブを設定:
-   - **Job name**: `ticket-api`
-   - **URL**: `https://go-event-ticket-reservation-production.up.railway.app/metrics`
-   - **Authentication**: Basic認証（Railway に設定した METRICS_USER/PASSWORD）
-   - **Scrape Interval**: 60秒（無料プランの推奨値）
-
-#### 3. ダッシュボードをインポート
-
-1. **Dashboards** → **Import** を選択
-2. `monitoring/grafana/dashboards/ticket-reservation.json` をアップロード
-3. データソースを Grafana Cloud の Prometheus に変更
 
 ### ダッシュボードパネル
 
@@ -610,12 +577,13 @@ railway variables
 #### エンドポイント
 
 ```bash
-# ローカル（認証なし）
 curl http://localhost:8080/metrics
 
-# 本番（Basic認証必須）
-curl -u "$METRICS_USER:$METRICS_PASSWORD" https://your-app.railway.app/metrics
+# 本番環境
+curl https://go-event-ticket-reservation-production.up.railway.app/metrics
 ```
+
+> **Note**: `/metrics` エンドポイントは意図的に認証なしで公開しています。Prometheus メトリクスには機密情報は含まれておらず、システムの透明性を優先しています。
 
 #### 収集メトリクス
 

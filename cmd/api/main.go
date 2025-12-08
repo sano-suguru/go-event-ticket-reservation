@@ -115,11 +115,8 @@ func main() {
 	// Prometheusミドルウェア追加
 	e.Use(middleware.PrometheusMiddleware(appMetrics))
 
-	// メトリクスエンドポイント（Basic認証付き - 本番環境用）
-	// METRICS_USER と METRICS_PASSWORD が設定されている場合のみ認証を要求
-	metricsGroup := e.Group("")
-	metricsGroup.Use(middleware.MetricsBasicAuth())
-	metricsGroup.GET("/metrics", echo.WrapHandler(promhttp.Handler()))
+	// メトリクスエンドポイント（認証なし - 意図的に公開）
+	e.GET("/metrics", echo.WrapHandler(promhttp.Handler()))
 
 	// ヘルスチェック（ルートレベル - Railway/K8s対応）
 	e.GET("/health", healthHandler.Check)
