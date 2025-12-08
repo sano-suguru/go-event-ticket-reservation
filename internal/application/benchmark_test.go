@@ -42,10 +42,11 @@ func TestBenchmark_LargeScaleSeats(t *testing.T) {
 	eventRepo := postgres.NewEventRepository(db)
 	seatRepo := postgres.NewSeatRepository(db)
 	reservationRepo := postgres.NewReservationRepository(db)
+	txManager := postgres.NewTxManager(db)
 
 	eventService := NewEventService(eventRepo)
-	seatService := NewSeatService(db, seatRepo, eventRepo, nil)
-	reservationService := NewReservationService(db, reservationRepo, seatRepo, eventRepo, lockManager, nil)
+	seatService := NewSeatService(seatRepo, eventRepo, nil)
+	reservationService := NewReservationService(txManager, reservationRepo, seatRepo, eventRepo, lockManager, nil)
 
 	cleanup := func() {
 		db.Exec("DELETE FROM reservation_seats")
@@ -219,7 +220,7 @@ func BenchmarkSeatQueries(b *testing.B) {
 
 	eventRepo := postgres.NewEventRepository(db)
 	seatRepo := postgres.NewSeatRepository(db)
-	seatService := NewSeatService(db, seatRepo, eventRepo, nil)
+	seatService := NewSeatService(seatRepo, eventRepo, nil)
 
 	ctx := context.Background()
 

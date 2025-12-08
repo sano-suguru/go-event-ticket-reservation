@@ -41,7 +41,7 @@ func setupTestEnv(t *testing.T) (*ReservationService, *SeatService, *EventServic
 	txManager := postgres.NewTxManager(db)
 
 	eventService := NewEventService(eventRepo)
-	seatService := NewSeatService(db, seatRepo, eventRepo, nil)
+	seatService := NewSeatService(seatRepo, eventRepo, nil)
 	reservationService := NewReservationService(txManager, reservationRepo, seatRepo, eventRepo, lockManager, nil)
 
 	cleanup := func() {
