@@ -2,9 +2,6 @@ run:
   timeout: 5m
   modules-download-mode: readonly
   concurrency: 4
-  skip-dirs:
-    - docs
-    - vendor
 
 linters:
   enable:
@@ -30,6 +27,9 @@ linters-settings:
     local-prefixes: github.com/sanosuguru/go-event-ticket-reservation
 
 issues:
+  exclude-dirs:
+    - docs
+    - vendor
   exclude-rules:
     - path: _test\.go
       linters:
