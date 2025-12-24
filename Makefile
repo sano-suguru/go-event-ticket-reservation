@@ -32,6 +32,7 @@ test-integration:
 # Lint
 lint:
 	@echo "==> Lintを実行しています..."
+	@which golangci-lint > /dev/null || (echo "golangci-lint がインストールされていません。\n  brew install golangci-lint  または  go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest" && exit 1)
 	golangci-lint run ./...
 
 # 依存関係の整理
