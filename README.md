@@ -288,6 +288,8 @@ open http://localhost:8080/swagger/index.html
 
 詳細は [Swagger UI](https://go-event-ticket-reservation-production.up.railway.app/swagger/index.html) を参照。
 
+> **認証について**: デモ用のため `X-User-ID` ヘッダーで識別しています。本番利用時は JWT 等に置き換えてください。
+
 ---
 
 ## プロジェクト構成
@@ -307,6 +309,19 @@ open http://localhost:8080/swagger/index.html
 ├── db/migrations/    # SQLマイグレーション
 └── docs/             # 技術ドキュメント
 ```
+
+---
+
+## テスト
+
+| レイヤー | カバレッジ | 備考 |
+|----------|-------------|------|
+| Domain | 100% | 単体テスト |
+| Application | 89% | 単体テスト |
+| Handler | 91% | 単体テスト |
+| Infrastructure | - | E2Eでカバー |
+
+`infrastructure/postgres` は実DBを使ったE2Eテストでカバーしています。
 
 ---
 
