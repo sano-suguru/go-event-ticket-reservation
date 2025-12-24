@@ -1,43 +1,58 @@
+version: "2"
 run:
-  timeout: 5m
-  modules-download-mode: readonly
   concurrency: 4
-
+  modules-download-mode: readonly
 linters:
   enable:
-    - errcheck
-    - gosimple
-    - govet
-    - ineffassign
-    - staticcheck
-    - unused
-    - gofmt
-    - goimports
     - misspell
     - unconvert
-
-linters-settings:
-  errcheck:
-    check-type-assertions: true
-  govet:
-    enable-all: true
-    disable:
-      - fieldalignment
-  goimports:
-    local-prefixes: github.com/sanosuguru/go-event-ticket-reservation
-
-issues:
-  exclude-dirs:
-    - docs
-    - vendor
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - errcheck
-    - path: docs/
-      linters:
-        - all
-    # defer での Rollback/Sync/Release は意図的に無視
-    - source: "defer.*\\.(Rollback|Sync|Release)\\("
-      linters:
-        - errcheck
+  settings:
+    errcheck:
+      check-type-assertions: true
+    govet:
+      disable:
+        - fieldalignment
+      enable-all: true
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - errcheck
+        path: _test\.go
+      - linters:
+          - all
+        path: docs/
+      - linters:
+          - errcheck
+        source: defer.*\.(Rollback|Sync|Release)\(
+      # 日本語エラーメッセージは大文字始まり警告を無視
+      - linters:
+          - staticcheck
+        text: "ST1005:"
+    paths:
+      - docs
+      - vendor
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/sanosuguru/go-event-ticket-reservation
+  exclusions:
+    generated: lax
+    paths:
+      - docs
+      - vendor
+      - third_party$
+      - builtin$
+      - examples$
