@@ -288,7 +288,7 @@ open http://localhost:8080/swagger/index.html
 
 詳細は [Swagger UI](https://go-event-ticket-reservation-production.up.railway.app/swagger/index.html) を参照。
 
-> **⚠️ 認証について**: 本システムは技術デモのため、`X-User-ID` ヘッダーによる簡易的なユーザー識別を使用しています。本番環境では JWT や OAuth 2.0 などの適切な認証・認可メカニズムを実装してください。
+> **認証について**: デモ用のため `X-User-ID` ヘッダーで識別しています。本番利用時は JWT 等に置き換えてください。
 
 ---
 
@@ -312,18 +312,16 @@ open http://localhost:8080/swagger/index.html
 
 ---
 
-## テスト戦略
+## テスト
 
-本プロジェクトではテストピラミッドに基づいたテスト戦略を採用しています。
-
-| レイヤー | カバレッジ | 説明 |
+| レイヤー | カバレッジ | 備考 |
 |----------|-------------|------|
-| **Domain** | 100% | ビジネスロジックの単体テスト |
-| **Application** | 89% | ユースケース・トランザクション境界のテスト |
-| **Handler** | 91% | HTTPハンドラーのテスト |
-| **Infrastructure** | E2E | 実DB/Redisを使用した統合テスト |
+| Domain | 100% | 単体テスト |
+| Application | 89% | 単体テスト |
+| Handler | 91% | 単体テスト |
+| Infrastructure | - | E2Eでカバー |
 
-> **Note**: `infrastructure/postgres` 層は単体テストのカバレッジが 0% ですが、これは意図的です。データベース操作は実際の PostgreSQL を使用した E2E テストでカバーしており、モックを使った単体テストより信頼性が高いためです。
+`infrastructure/postgres` は実DBを使ったE2Eテストでカバーしています。
 
 ---
 
