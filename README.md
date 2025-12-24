@@ -288,6 +288,8 @@ open http://localhost:8080/swagger/index.html
 
 詳細は [Swagger UI](https://go-event-ticket-reservation-production.up.railway.app/swagger/index.html) を参照。
 
+> **⚠️ 認証について**: 本システムは技術デモのため、`X-User-ID` ヘッダーによる簡易的なユーザー識別を使用しています。本番環境では JWT や OAuth 2.0 などの適切な認証・認可メカニズムを実装してください。
+
 ---
 
 ## プロジェクト構成
@@ -307,6 +309,21 @@ open http://localhost:8080/swagger/index.html
 ├── db/migrations/    # SQLマイグレーション
 └── docs/             # 技術ドキュメント
 ```
+
+---
+
+## テスト戦略
+
+本プロジェクトではテストピラミッドに基づいたテスト戦略を採用しています。
+
+| レイヤー | カバレッジ | 説明 |
+|----------|-------------|------|
+| **Domain** | 100% | ビジネスロジックの単体テスト |
+| **Application** | 89% | ユースケース・トランザクション境界のテスト |
+| **Handler** | 91% | HTTPハンドラーのテスト |
+| **Infrastructure** | E2E | 実DB/Redisを使用した統合テスト |
+
+> **Note**: `infrastructure/postgres` 層は単体テストのカバレッジが 0% ですが、これは意図的です。データベース操作は実際の PostgreSQL を使用した E2E テストでカバーしており、モックを使った単体テストより信頼性が高いためです。
 
 ---
 
