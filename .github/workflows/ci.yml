@@ -19,10 +19,10 @@ jobs:
           go-version: "1.25.5"
           cache: true
 
-      - name: Install golangci-lint
-        uses: golangci/golangci-lint-action@v6
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v9
         with:
-          version: latest
+          version: v2.7
           args: --timeout=5m
           # PR時は差分のみチェックして高速化
           only-new-issues: ${{ github.event_name == 'pull_request' }}
