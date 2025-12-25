@@ -11,10 +11,10 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: "1.25.5"
           cache: true
@@ -31,10 +31,10 @@ jobs:
     name: Security
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: "1.25.5"
           cache: true
@@ -75,10 +75,10 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: "1.25.5"
           cache: true
@@ -87,7 +87,7 @@ jobs:
       # actions/setup-go の cache: true は GOMODCACHE のみ対象
       # GOCACHE を明示的にキャッシュすることでテストコンパイル時間を短縮
       - name: Cache Go build
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/go-build
           key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
@@ -96,7 +96,7 @@ jobs:
 
       - name: Cache golang-migrate
         id: cache-migrate
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/go/bin/migrate
           key: ${{ runner.os }}-migrate-v4.19.1
@@ -132,7 +132,7 @@ jobs:
         run: go test -v -race -tags=integration -short -p 1 -coverprofile=coverage.out ./...
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           files: ./coverage.out
           fail_ci_if_error: false
@@ -142,10 +142,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: [lint, security, test]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: "1.25.5"
           cache: true
