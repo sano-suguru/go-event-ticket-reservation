@@ -40,6 +40,11 @@ db/migrations/               # golang-migrate SQLファイル
 2. **楽観的ロック (PostgreSQL)**: `internal/infrastructure/postgres/seat_repository.go`
 3. **冪等性チェック**: `internal/application/reservation_service.go`
 
+## デプロイ環境
+- **本番**: Railway（`railway.toml` で設定）
+- **CI/CD**: GitHub Actions（`.github/workflows/`）
+- Railway は GitHub の main ブランチ push を検知して自動デプロイ
+
 ## 重要な設計原則
 - ドメイン層は外部依存ゼロ
 - トランザクション管理はアプリケーション層のみ
