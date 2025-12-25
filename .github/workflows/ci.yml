@@ -115,9 +115,10 @@ jobs:
           DB_SSLMODE: disable
           REDIS_HOST: localhost
           REDIS_PORT: 6379
+        # -tags=integration: 統合テスト（並行予約、冪等性、分散ロック）を含める
         # -short: 大規模ベンチマークテストをスキップ
         # -p 1: パッケージ並列実行を無効化（同じDBを共有するため干渉を防止）
-        run: go test -v -race -short -p 1 -coverprofile=coverage.out ./...
+        run: go test -v -race -tags=integration -short -p 1 -coverprofile=coverage.out ./...
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
