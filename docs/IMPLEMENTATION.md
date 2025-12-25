@@ -975,107 +975,159 @@ func (s *ReservationService) CreateReservation(...) {
 
 ## CI/CD パイプライン
 
-### GitHub Actions ワークフロー
-
-コードを push すると自動で品質チェックが実行されます。
+### 全体構成
 
 ```mermaid
-flowchart LR
-    subgraph トリガー
+flowchart TB
+    subgraph Trigger[トリガー]
         Push[push to main]
         PR[Pull Request]
     end
-    
-    subgraph CI パイプライン
-        Lint[Lint<br/>コード品質チェック]
-        Security[Security<br/>脆弱性スキャン]
+
+    subgraph CI[CI ワークフロー]
+        Lint[Lint<br/>golangci-lint]
+        GovulnSec[Security<br/>govulncheck]
         Test[Test<br/>単体・統合テスト]
-        Build[Build<br/>ビルド確認]
+        Build[Build]
     end
-    
-    Push --> Lint
-    Push --> Security
-    Push --> Test
-    PR --> Lint
-    PR --> Security
-    PR --> Test
+
+    subgraph SecurityScan[Security Scan ワークフロー]
+        TrivyContainer[Trivy Container<br/>Docker イメージスキャン]
+        TrivyFS[Trivy Filesystem<br/>ソースコードスキャン]
+    end
+
+    subgraph ReleaseWF[Release ワークフロー]
+        RP[Release Please<br/>自動リリース]
+        SBOM[Syft<br/>SBOM 生成]
+    end
+
+    subgraph Dependabot[Dependabot]
+        GoMod[Go モジュール<br/>週次更新]
+        Actions[GitHub Actions<br/>週次更新]
+        Docker[Docker<br/>週次更新]
+    end
+
+    subgraph Deploy[デプロイ]
+        Railway[Railway<br/>自動デプロイ]
+    end
+
+    Push --> CI
+    Push --> SecurityScan
+    Push --> ReleaseWF
+    PR --> CI
+    PR --> SecurityScan
+
     Lint --> Build
-    Security --> Build
+    GovulnSec --> Build
     Test --> Build
-    
-    style Lint fill:#fff3e0
-    style Security fill:#ffebee
-    style Test fill:#e3f2fd
-    style Build fill:#e8f5e9
+
+    RP -->|リリース作成時| SBOM
+
+    Push --> Railway
+
+    style CI fill:#e3f2fd
+    style SecurityScan fill:#ffebee
+    style ReleaseWF fill:#fff3e0
+    style Dependabot fill:#e8f5e9
+    style Deploy fill:#f3e5f5
 ```
 
-### ワークフロー設定
+### ワークフロー一覧
 
-```yaml
-# .github/workflows/ci.yml
+| ファイル | 目的 | トリガー |
+|----------|------|----------|
+| [`ci.yml`](../.github/workflows/ci.yml) | Lint, テスト, ビルド | push, PR |
+| [`security.yml`](../.github/workflows/security.yml) | Trivy セキュリティスキャン | push, PR |
+| [`release.yml`](../.github/workflows/release.yml) | リリース自動化, SBOM 生成 | push to main |
+| [`dependabot.yml`](../.github/dependabot.yml) | 依存関係の自動更新 | 週次（月曜 9:00 JST） |
 
-name: CI
+### CI ワークフロー
 
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-
-jobs:
-  lint:
-    # golangci-lint でコード品質をチェック
-    steps:
-      - uses: golangci/golangci-lint-action@v4
-        with:
-          args: --timeout=5m
-
-  security:
-    # govulncheck で依存パッケージの脆弱性をチェック
-    steps:
-      - run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
-          govulncheck ./...
-
-  test:
-    # PostgreSQL と Redis をサービスコンテナとして起動
-    services:
-      postgres:
-        image: postgres:16-alpine
-      redis:
-        image: redis:7-alpine
-    steps:
-      - run: go test -v -race -coverprofile=coverage.out ./...
-
-  build:
-    # lint, security, test が成功した場合のみ実行
-    needs: [lint, security, test]
-    steps:
-      - run: go build -v ./cmd/api
-```
-
-### チェック内容
+コードを push すると自動で品質チェックが実行されます。
 
 | ジョブ | 内容 | 失敗時 |
 |-------|------|--------|
-| **Lint** | コードスタイル、潜在的バグ検出 | PR をマージ不可 |
-| **Security** | 依存パッケージの脆弱性チェック | PR をマージ不可 |
-| **Test** | 全テスト実行（DB/Redis 使用） | PR をマージ不可 |
+| **Lint** | golangci-lint によるコード品質チェック | PR をマージ不可 |
+| **Security** | govulncheck による依存パッケージの脆弱性チェック | 警告表示（標準ライブラリの脆弱性は CI を止めない） |
+| **Test** | PostgreSQL/Redis を使った全テスト実行 | PR をマージ不可 |
 | **Build** | バイナリがビルドできるか確認 | PR をマージ不可 |
 
-### golangci-lint の設定
+### Security Scan ワークフロー
 
-```yaml
-# .golangci.yml
+[Trivy](https://trivy.dev/) によるセキュリティスキャンを実行します。
 
-linters:
-  enable:
-    - errcheck      # エラーハンドリング漏れ
-    - govet         # 一般的なバグパターン
-    - staticcheck   # 静的解析
-    - goimports     # import の整理
-    - misspell      # スペルミス
+| スキャン対象 | 内容 |
+|--------------|------|
+| **Container** | Docker イメージ内の OS パッケージ・ライブラリの脆弱性 |
+| **Filesystem** | ソースコード内の依存関係・シークレットの検出 |
+
+スキャン結果は GitHub の **Security タブ** で確認できます。
+
+### Dependabot
+
+依存関係を自動で最新に保ちます。
+
+| 対象 | 更新頻度 | グルーピング |
+|------|----------|--------------|
+| Go モジュール | 週次（月曜 9:00 JST） | テスト関連を1つのPRにまとめる |
+| GitHub Actions | 週次 | 全アクションを1つのPRにまとめる |
+| Docker | 週次 | - |
+
+### Release Please と SBOM 生成
+
+[Release Please](https://github.com/googleapis/release-please) により、Conventional Commits に基づいたリリースを自動化しています。
+
+| ジョブ | 内容 |
+|-------|------|
+| **Release Please** | コミット履歴から Release PR を自動作成、マージで GitHub Release 作成 |
+| **SBOM 生成** | リリース時に [Syft](https://github.com/anchore/syft) で SBOM（CycloneDX 形式）を生成し、Release に添付 |
+
+**Conventional Commits との対応:**
+
+| Commit Prefix | バージョン変更 | 例 |
+|---------------|----------------|-----|
+| `feat:` | MINOR（0.1.0 → 0.2.0） | `feat: ログイン機能を追加` |
+| `fix:` | PATCH（0.1.0 → 0.1.1） | `fix: 予約キャンセルのバグを修正` |
+| `feat!:` | MAJOR（0.1.0 → 1.0.0） | `feat!: API レスポンス形式を変更` |
+| `chore:`, `docs:` | 変更なし | `chore: CI 設定を更新` |
+
+**SBOM（Software Bill of Materials）:**
+
+リリースごとに Docker イメージの依存関係を CycloneDX JSON 形式で出力します。これにより、使用しているライブラリとそのバージョンを追跡でき、脆弱性対応時の影響範囲特定に役立ちます。
+
+### デプロイ（Railway）
+
+本番環境へのデプロイは **Railway** が自動で行います。GitHub Actions からの直接デプロイは行わず、Railway の GitHub 連携機能を使用しています。
+
+```mermaid
+sequenceDiagram
+    participant Dev as 開発者
+    participant GH as GitHub
+    participant CI as GitHub Actions
+    participant Railway as Railway
+
+    Dev->>GH: git push main
+
+    par CI チェック
+        GH->>CI: CI ワークフロー起動
+        CI->>CI: Lint, Test, Build
+        CI->>GH: ステータス報告
+    and セキュリティスキャン
+        GH->>CI: Security Scan 起動
+        CI->>CI: Trivy スキャン
+        CI->>GH: SARIF アップロード
+    and 自動デプロイ
+        GH->>Railway: Webhook 通知
+        Railway->>Railway: Dockerfile ビルド
+        Railway->>Railway: デプロイ
+    end
 ```
+
+| 項目 | 設定 |
+|------|------|
+| トリガー | `main` ブランチへの push |
+| ビルド | Railway が `Dockerfile` を検出して自動ビルド |
+| 設定ファイル | [`railway.toml`](../railway.toml) |
 
 ### ローカルでの実行
 
