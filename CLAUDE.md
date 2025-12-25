@@ -159,3 +159,8 @@ GitHub Actions (`.github/workflows/ci.yml`):
 4. **build** - Compile binary
 
 Tests run with `-race -short -p 1` to serialize package execution.
+
+## Git Commit Guidelines
+
+- Do not add Claude signatures (`🤖 Generated with Claude Code` or `Co-Authored-By`) to commit messages
+- Write commit messages in Japanese
