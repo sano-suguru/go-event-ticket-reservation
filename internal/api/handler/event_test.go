@@ -61,7 +61,7 @@ func (m *MockEventService) DeleteEvent(ctx context.Context, id string) error {
 }
 
 func TestEventHandler_Create(t *testing.T) {
-	e := echo.New()
+	e := NewTestEcho()
 
 	t.Run("正常にイベントを作成できる", func(t *testing.T) {
 		mockService := new(MockEventService)
@@ -121,8 +121,10 @@ func TestEventHandler_Create(t *testing.T) {
 
 		err := handler.Create(c)
 
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		require.Error(t, err)
+		he, ok := err.(*echo.HTTPError)
+		require.True(t, ok)
+		assert.Equal(t, http.StatusBadRequest, he.Code)
 	})
 
 	t.Run("不正な開始時刻形式でエラー", func(t *testing.T) {
@@ -142,9 +144,11 @@ func TestEventHandler_Create(t *testing.T) {
 
 		err := handler.Create(c)
 
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusBadRequest, rec.Code)
-		assert.Contains(t, rec.Body.String(), "開始時刻")
+		require.Error(t, err)
+		he, ok := err.(*echo.HTTPError)
+		require.True(t, ok)
+		assert.Equal(t, http.StatusBadRequest, he.Code)
+		assert.Contains(t, he.Message, "開始時刻")
 	})
 
 	t.Run("不正な終了時刻形式でエラー", func(t *testing.T) {
@@ -164,14 +168,16 @@ func TestEventHandler_Create(t *testing.T) {
 
 		err := handler.Create(c)
 
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusBadRequest, rec.Code)
-		assert.Contains(t, rec.Body.String(), "終了時刻")
+		require.Error(t, err)
+		he, ok := err.(*echo.HTTPError)
+		require.True(t, ok)
+		assert.Equal(t, http.StatusBadRequest, he.Code)
+		assert.Contains(t, he.Message, "終了時刻")
 	})
 }
 
 func TestEventHandler_GetByID(t *testing.T) {
-	e := echo.New()
+	e := NewTestEcho()
 
 	t.Run("正常にイベントを取得できる", func(t *testing.T) {
 		mockService := new(MockEventService)
@@ -225,15 +231,17 @@ func TestEventHandler_GetByID(t *testing.T) {
 
 		err := handler.GetByID(c)
 
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusNotFound, rec.Code)
+		require.Error(t, err)
+		he, ok := err.(*echo.HTTPError)
+		require.True(t, ok)
+		assert.Equal(t, http.StatusNotFound, he.Code)
 
 		mockService.AssertExpectations(t)
 	})
 }
 
 func TestEventHandler_List(t *testing.T) {
-	e := echo.New()
+	e := NewTestEcho()
 
 	t.Run("正常にイベント一覧を取得できる", func(t *testing.T) {
 		mockService := new(MockEventService)
@@ -266,7 +274,7 @@ func TestEventHandler_List(t *testing.T) {
 }
 
 func TestEventHandler_Delete(t *testing.T) {
-	e := echo.New()
+	e := NewTestEcho()
 
 	t.Run("正常にイベントを削除できる", func(t *testing.T) {
 		mockService := new(MockEventService)
@@ -302,15 +310,17 @@ func TestEventHandler_Delete(t *testing.T) {
 
 		err := handler.Delete(c)
 
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusNotFound, rec.Code)
+		require.Error(t, err)
+		he, ok := err.(*echo.HTTPError)
+		require.True(t, ok)
+		assert.Equal(t, http.StatusNotFound, he.Code)
 
 		mockService.AssertExpectations(t)
 	})
 }
 
 func TestEventHandler_Update(t *testing.T) {
-	e := echo.New()
+	e := NewTestEcho()
 
 	t.Run("正常にイベントを更新できる", func(t *testing.T) {
 		mockService := new(MockEventService)
@@ -373,8 +383,10 @@ func TestEventHandler_Update(t *testing.T) {
 
 		err := handler.Update(c)
 
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		require.Error(t, err)
+		he, ok := err.(*echo.HTTPError)
+		require.True(t, ok)
+		assert.Equal(t, http.StatusBadRequest, he.Code)
 	})
 
 	t.Run("不正な開始時刻形式でエラー", func(t *testing.T) {
@@ -396,9 +408,11 @@ func TestEventHandler_Update(t *testing.T) {
 
 		err := handler.Update(c)
 
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusBadRequest, rec.Code)
-		assert.Contains(t, rec.Body.String(), "開始時刻")
+		require.Error(t, err)
+		he, ok := err.(*echo.HTTPError)
+		require.True(t, ok)
+		assert.Equal(t, http.StatusBadRequest, he.Code)
+		assert.Contains(t, he.Message, "開始時刻")
 	})
 
 	t.Run("不正な終了時刻形式でエラー", func(t *testing.T) {
@@ -420,9 +434,11 @@ func TestEventHandler_Update(t *testing.T) {
 
 		err := handler.Update(c)
 
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusBadRequest, rec.Code)
-		assert.Contains(t, rec.Body.String(), "終了時刻")
+		require.Error(t, err)
+		he, ok := err.(*echo.HTTPError)
+		require.True(t, ok)
+		assert.Equal(t, http.StatusBadRequest, he.Code)
+		assert.Contains(t, he.Message, "終了時刻")
 	})
 
 	t.Run("イベントが見つからない場合404", func(t *testing.T) {
@@ -447,8 +463,10 @@ func TestEventHandler_Update(t *testing.T) {
 
 		err := handler.Update(c)
 
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusNotFound, rec.Code)
+		require.Error(t, err)
+		he, ok := err.(*echo.HTTPError)
+		require.True(t, ok)
+		assert.Equal(t, http.StatusNotFound, he.Code)
 
 		mockService.AssertExpectations(t)
 	})
@@ -475,8 +493,10 @@ func TestEventHandler_Update(t *testing.T) {
 
 		err := handler.Update(c)
 
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		require.Error(t, err)
+		he, ok := err.(*echo.HTTPError)
+		require.True(t, ok)
+		assert.Equal(t, http.StatusBadRequest, he.Code)
 
 		mockService.AssertExpectations(t)
 	})

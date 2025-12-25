@@ -63,17 +63,20 @@ func toReservationResponse(r *reservation.Reservation) ReservationResponse {
 func (h *ReservationHandler) Create(c echo.Context) error {
 	userID := c.Request().Header.Get("X-User-ID")
 	if userID == "" {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "ユーザーIDが必要です"})
+		return echo.NewHTTPError(http.StatusUnauthorized, "ユーザーIDが必要です")
 	}
 	var req CreateReservationRequest
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "無効なリクエスト"})
+		return echo.NewHTTPError(http.StatusBadRequest, "無効なリクエスト")
+	}
+	if err := c.Validate(&req); err != nil {
+		return err
 	}
 	r, err := h.service.CreateReservation(c.Request().Context(), application.CreateReservationInput{
 		EventID: req.EventID, UserID: userID, SeatIDs: req.SeatIDs, IdempotencyKey: req.IdempotencyKey,
 	})
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	return c.JSON(http.StatusCreated, toReservationResponse(r))
 }
@@ -92,9 +95,9 @@ func (h *ReservationHandler) GetByID(c echo.Context) error {
 	r, err := h.service.GetReservation(c.Request().Context(), id)
 	if err != nil {
 		if errors.Is(err, reservation.ErrReservationNotFound) {
-			return c.JSON(http.StatusNotFound, map[string]string{"error": err.Error()})
+			return echo.NewHTTPError(http.StatusNotFound, err.Error())
 		}
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 	return c.JSON(http.StatusOK, toReservationResponse(r))
 }
@@ -113,13 +116,13 @@ func (h *ReservationHandler) GetByID(c echo.Context) error {
 func (h *ReservationHandler) GetUserReservations(c echo.Context) error {
 	userID := c.Request().Header.Get("X-User-ID")
 	if userID == "" {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "ユーザーIDが必要です"})
+		return echo.NewHTTPError(http.StatusUnauthorized, "ユーザーIDが必要です")
 	}
 	limit, _ := strconv.Atoi(c.QueryParam("limit"))
 	offset, _ := strconv.Atoi(c.QueryParam("offset"))
 	reservations, err := h.service.GetUserReservations(c.Request().Context(), userID, limit, offset)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 	resp := make([]ReservationResponse, len(reservations))
 	for i, r := range reservations {
@@ -143,9 +146,9 @@ func (h *ReservationHandler) Confirm(c echo.Context) error {
 	r, err := h.service.ConfirmReservation(c.Request().Context(), id)
 	if err != nil {
 		if errors.Is(err, reservation.ErrReservationNotFound) {
-			return c.JSON(http.StatusNotFound, map[string]string{"error": err.Error()})
+			return echo.NewHTTPError(http.StatusNotFound, err.Error())
 		}
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	return c.JSON(http.StatusOK, toReservationResponse(r))
 }
@@ -165,9 +168,9 @@ func (h *ReservationHandler) Cancel(c echo.Context) error {
 	r, err := h.service.CancelReservation(c.Request().Context(), id)
 	if err != nil {
 		if errors.Is(err, reservation.ErrReservationNotFound) {
-			return c.JSON(http.StatusNotFound, map[string]string{"error": err.Error()})
+			return echo.NewHTTPError(http.StatusNotFound, err.Error())
 		}
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	return c.JSON(http.StatusOK, toReservationResponse(r))
 }

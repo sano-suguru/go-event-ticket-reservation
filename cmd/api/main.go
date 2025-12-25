@@ -15,6 +15,7 @@ import (
 	"go.uber.org/zap"
 
 	_ "github.com/sanosuguru/go-event-ticket-reservation/docs"
+	"github.com/sanosuguru/go-event-ticket-reservation/internal/api"
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/api/handler"
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/api/middleware"
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/application"
@@ -110,6 +111,8 @@ func main() {
 	appMetrics := metrics.Init()
 
 	e := echo.New()
+	e.Validator = api.NewValidator()
+	e.HTTPErrorHandler = api.CustomHTTPErrorHandler
 	middleware.SetupMiddleware(e)
 
 	// Prometheusミドルウェア追加

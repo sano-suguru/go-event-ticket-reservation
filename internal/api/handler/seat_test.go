@@ -69,7 +69,7 @@ func (m *MockSeatService) CountAvailableSeats(ctx context.Context, eventID strin
 }
 
 func TestSeatHandler_GetByEvent(t *testing.T) {
-	e := echo.New()
+	e := NewTestEcho()
 
 	t.Run("全座席を取得できる", func(t *testing.T) {
 		mockService := new(MockSeatService)
@@ -136,7 +136,7 @@ func TestSeatHandler_GetByEvent(t *testing.T) {
 }
 
 func TestSeatHandler_Create(t *testing.T) {
-	e := echo.New()
+	e := NewTestEcho()
 
 	t.Run("正常に座席を作成できる", func(t *testing.T) {
 		mockService := new(MockSeatService)
@@ -191,13 +191,15 @@ func TestSeatHandler_Create(t *testing.T) {
 
 		err := handler.Create(c)
 
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		require.Error(t, err)
+		he, ok := err.(*echo.HTTPError)
+		require.True(t, ok)
+		assert.Equal(t, http.StatusBadRequest, he.Code)
 	})
 }
 
 func TestSeatHandler_CreateBulk(t *testing.T) {
-	e := echo.New()
+	e := NewTestEcho()
 
 	t.Run("正常に一括作成できる", func(t *testing.T) {
 		mockService := new(MockSeatService)
@@ -235,7 +237,7 @@ func TestSeatHandler_CreateBulk(t *testing.T) {
 }
 
 func TestSeatHandler_GetByID(t *testing.T) {
-	e := echo.New()
+	e := NewTestEcho()
 
 	t.Run("正常に座席を取得できる", func(t *testing.T) {
 		mockService := new(MockSeatService)
@@ -282,15 +284,17 @@ func TestSeatHandler_GetByID(t *testing.T) {
 
 		err := handler.GetByID(c)
 
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusNotFound, rec.Code)
+		require.Error(t, err)
+		he, ok := err.(*echo.HTTPError)
+		require.True(t, ok)
+		assert.Equal(t, http.StatusNotFound, he.Code)
 
 		mockService.AssertExpectations(t)
 	})
 }
 
 func TestSeatHandler_CountAvailable(t *testing.T) {
-	e := echo.New()
+	e := NewTestEcho()
 
 	t.Run("正常に空席数を取得できる", func(t *testing.T) {
 		mockService := new(MockSeatService)

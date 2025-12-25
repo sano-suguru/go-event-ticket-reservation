@@ -70,7 +70,7 @@ func (m *MockReservationService) CancelExpiredReservations(ctx context.Context, 
 }
 
 func TestReservationHandler_Create(t *testing.T) {
-	e := echo.New()
+	e := NewTestEcho()
 
 	t.Run("正常に予約を作成できる", func(t *testing.T) {
 		mockService := new(MockReservationService)
@@ -131,8 +131,10 @@ func TestReservationHandler_Create(t *testing.T) {
 
 		err := handler.Create(c)
 
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusUnauthorized, rec.Code)
+		require.Error(t, err)
+		he, ok := err.(*echo.HTTPError)
+		require.True(t, ok)
+		assert.Equal(t, http.StatusUnauthorized, he.Code)
 	})
 
 	t.Run("不正なリクエストでエラー", func(t *testing.T) {
@@ -147,13 +149,15 @@ func TestReservationHandler_Create(t *testing.T) {
 
 		err := handler.Create(c)
 
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		require.Error(t, err)
+		he, ok := err.(*echo.HTTPError)
+		require.True(t, ok)
+		assert.Equal(t, http.StatusBadRequest, he.Code)
 	})
 }
 
 func TestReservationHandler_GetByID(t *testing.T) {
-	e := echo.New()
+	e := NewTestEcho()
 
 	t.Run("正常に予約を取得できる", func(t *testing.T) {
 		mockService := new(MockReservationService)
@@ -202,15 +206,17 @@ func TestReservationHandler_GetByID(t *testing.T) {
 
 		err := handler.GetByID(c)
 
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusNotFound, rec.Code)
+		require.Error(t, err)
+		he, ok := err.(*echo.HTTPError)
+		require.True(t, ok)
+		assert.Equal(t, http.StatusNotFound, he.Code)
 
 		mockService.AssertExpectations(t)
 	})
 }
 
 func TestReservationHandler_GetUserReservations(t *testing.T) {
-	e := echo.New()
+	e := NewTestEcho()
 
 	t.Run("正常にユーザーの予約一覧を取得できる", func(t *testing.T) {
 		mockService := new(MockReservationService)
@@ -252,13 +258,15 @@ func TestReservationHandler_GetUserReservations(t *testing.T) {
 
 		err := handler.GetUserReservations(c)
 
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusUnauthorized, rec.Code)
+		require.Error(t, err)
+		he, ok := err.(*echo.HTTPError)
+		require.True(t, ok)
+		assert.Equal(t, http.StatusUnauthorized, he.Code)
 	})
 }
 
 func TestReservationHandler_Confirm(t *testing.T) {
-	e := echo.New()
+	e := NewTestEcho()
 
 	t.Run("正常に予約を確定できる", func(t *testing.T) {
 		mockService := new(MockReservationService)
@@ -314,8 +322,10 @@ func TestReservationHandler_Confirm(t *testing.T) {
 
 		err := handler.Confirm(c)
 
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusNotFound, rec.Code)
+		require.Error(t, err)
+		he, ok := err.(*echo.HTTPError)
+		require.True(t, ok)
+		assert.Equal(t, http.StatusNotFound, he.Code)
 
 		mockService.AssertExpectations(t)
 	})
@@ -334,15 +344,17 @@ func TestReservationHandler_Confirm(t *testing.T) {
 
 		err := handler.Confirm(c)
 
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		require.Error(t, err)
+		he, ok := err.(*echo.HTTPError)
+		require.True(t, ok)
+		assert.Equal(t, http.StatusBadRequest, he.Code)
 
 		mockService.AssertExpectations(t)
 	})
 }
 
 func TestReservationHandler_Cancel(t *testing.T) {
-	e := echo.New()
+	e := NewTestEcho()
 
 	t.Run("正常に予約をキャンセルできる", func(t *testing.T) {
 		mockService := new(MockReservationService)
@@ -396,8 +408,10 @@ func TestReservationHandler_Cancel(t *testing.T) {
 
 		err := handler.Cancel(c)
 
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusNotFound, rec.Code)
+		require.Error(t, err)
+		he, ok := err.(*echo.HTTPError)
+		require.True(t, ok)
+		assert.Equal(t, http.StatusNotFound, he.Code)
 
 		mockService.AssertExpectations(t)
 	})

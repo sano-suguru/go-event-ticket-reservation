@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -67,16 +68,19 @@ func toEventResponse(e *event.Event) *EventResponse {
 func (h *EventHandler) Create(c echo.Context) error {
 	var req CreateEventRequest
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "リクエストの形式が不正です"})
+		return echo.NewHTTPError(http.StatusBadRequest, "リクエストの形式が不正です")
+	}
+	if err := c.Validate(&req); err != nil {
+		return err
 	}
 
 	startAt, err := time.Parse(time.RFC3339, req.StartAt)
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "開始時刻の形式が不正です"})
+		return echo.NewHTTPError(http.StatusBadRequest, "開始時刻の形式が不正です")
 	}
 	endAt, err := time.Parse(time.RFC3339, req.EndAt)
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "終了時刻の形式が不正です"})
+		return echo.NewHTTPError(http.StatusBadRequest, "終了時刻の形式が不正です")
 	}
 
 	input := application.CreateEventInput{
@@ -90,7 +94,7 @@ func (h *EventHandler) Create(c echo.Context) error {
 
 	e, err := h.eventService.CreateEvent(c.Request().Context(), input)
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
 	return c.JSON(http.StatusCreated, toEventResponse(e))
@@ -109,10 +113,10 @@ func (h *EventHandler) GetByID(c echo.Context) error {
 	id := c.Param("id")
 	e, err := h.eventService.GetEvent(c.Request().Context(), id)
 	if err != nil {
-		if err == event.ErrEventNotFound {
-			return c.JSON(http.StatusNotFound, map[string]string{"error": "イベントが見つかりません"})
+		if errors.Is(err, event.ErrEventNotFound) {
+			return echo.NewHTTPError(http.StatusNotFound, "イベントが見つかりません")
 		}
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 	return c.JSON(http.StatusOK, toEventResponse(e))
 }
@@ -132,7 +136,7 @@ func (h *EventHandler) List(c echo.Context) error {
 
 	events, err := h.eventService.ListEvents(c.Request().Context(), limit, offset)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
 	responses := make([]*EventResponse, len(events))
@@ -158,16 +162,19 @@ func (h *EventHandler) Update(c echo.Context) error {
 	id := c.Param("id")
 	var req CreateEventRequest
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "リクエストの形式が不正です"})
+		return echo.NewHTTPError(http.StatusBadRequest, "リクエストの形式が不正です")
+	}
+	if err := c.Validate(&req); err != nil {
+		return err
 	}
 
 	startAt, err := time.Parse(time.RFC3339, req.StartAt)
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "開始時刻の形式が不正です"})
+		return echo.NewHTTPError(http.StatusBadRequest, "開始時刻の形式が不正です")
 	}
 	endAt, err := time.Parse(time.RFC3339, req.EndAt)
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "終了時刻の形式が不正です"})
+		return echo.NewHTTPError(http.StatusBadRequest, "終了時刻の形式が不正です")
 	}
 
 	input := application.UpdateEventInput{
@@ -182,10 +189,10 @@ func (h *EventHandler) Update(c echo.Context) error {
 
 	e, err := h.eventService.UpdateEvent(c.Request().Context(), input)
 	if err != nil {
-		if err == event.ErrEventNotFound {
-			return c.JSON(http.StatusNotFound, map[string]string{"error": "イベントが見つかりません"})
+		if errors.Is(err, event.ErrEventNotFound) {
+			return echo.NewHTTPError(http.StatusNotFound, "イベントが見つかりません")
 		}
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	return c.JSON(http.StatusOK, toEventResponse(e))
 }
@@ -202,10 +209,10 @@ func (h *EventHandler) Delete(c echo.Context) error {
 	id := c.Param("id")
 	err := h.eventService.DeleteEvent(c.Request().Context(), id)
 	if err != nil {
-		if err == event.ErrEventNotFound {
-			return c.JSON(http.StatusNotFound, map[string]string{"error": "イベントが見つかりません"})
+		if errors.Is(err, event.ErrEventNotFound) {
+			return echo.NewHTTPError(http.StatusNotFound, "イベントが見つかりません")
 		}
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 	return c.NoContent(http.StatusNoContent)
 }
