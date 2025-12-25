@@ -12,89 +12,12 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/sanosuguru/go-event-ticket-reservation/internal/api"
-	"github.com/sanosuguru/go-event-ticket-reservation/internal/api/handler"
-	"github.com/sanosuguru/go-event-ticket-reservation/internal/api/middleware"
-	"github.com/sanosuguru/go-event-ticket-reservation/internal/application"
-	"github.com/sanosuguru/go-event-ticket-reservation/internal/config"
-	"github.com/sanosuguru/go-event-ticket-reservation/internal/infrastructure/postgres"
-	redisinfra "github.com/sanosuguru/go-event-ticket-reservation/internal/infrastructure/redis"
 )
 
 // TestServer はE2Eテスト用のサーバー
 type TestServer struct {
 	Echo    *echo.Echo
 	Cleanup func()
-}
-
-// NewTestServer はテスト用サーバーを作成
-func NewTestServer(t *testing.T) *TestServer {
-	cfg := config.Load()
-
-	db, err := postgres.NewConnection(&cfg.Database)
-	if err != nil {
-		t.Skipf("DB接続エラー: %v", err)
-	}
-
-	redisClient, err := redisinfra.NewClient(&redisinfra.Config{
-		Host: cfg.Redis.Host, Port: cfg.Redis.Port,
-	})
-	if err != nil {
-		t.Skipf("Redis接続エラー: %v", err)
-	}
-
-	lockManager := redisinfra.NewLockManager(redisClient)
-	seatCache := redisinfra.NewSeatCache(redisClient)
-
-	eventRepo := postgres.NewEventRepository(db)
-	seatRepo := postgres.NewSeatRepository(db)
-	reservationRepo := postgres.NewReservationRepository(db)
-	txManager := postgres.NewTxManager(db)
-
-	eventService := application.NewEventService(eventRepo)
-	seatService := application.NewSeatService(seatRepo, eventRepo, seatCache)
-	reservationService := application.NewReservationService(txManager, reservationRepo, seatRepo, eventRepo, lockManager, seatCache)
-
-	eventHandler := handler.NewEventHandler(eventService)
-	seatHandler := handler.NewSeatHandler(seatService)
-	reservationHandler := handler.NewReservationHandler(reservationService)
-	healthHandler := handler.NewHealthHandler()
-
-	e := echo.New()
-	e.Validator = api.NewValidator()
-	middleware.SetupMiddleware(e)
-
-	e.GET("/health", healthHandler.Check)
-
-	v1 := e.Group("/api/v1")
-	v1.POST("/events", eventHandler.Create)
-	v1.GET("/events", eventHandler.List)
-	v1.GET("/events/:id", eventHandler.GetByID)
-	v1.PUT("/events/:id", eventHandler.Update)
-	v1.DELETE("/events/:id", eventHandler.Delete)
-
-	v1.GET("/events/:event_id/seats", seatHandler.GetByEvent)
-	v1.POST("/events/:event_id/seats", seatHandler.Create)
-	v1.POST("/events/:event_id/seats/bulk", seatHandler.CreateBulk)
-	v1.GET("/events/:event_id/seats/available/count", seatHandler.CountAvailable)
-
-	v1.POST("/reservations", reservationHandler.Create)
-	v1.GET("/reservations", reservationHandler.GetUserReservations)
-	v1.GET("/reservations/:id", reservationHandler.GetByID)
-	v1.POST("/reservations/:id/confirm", reservationHandler.Confirm)
-	v1.POST("/reservations/:id/cancel", reservationHandler.Cancel)
-
-	cleanup := func() {
-		db.Exec("DELETE FROM reservation_seats")
-		db.Exec("DELETE FROM reservations")
-		db.Exec("DELETE FROM seats")
-		db.Exec("DELETE FROM events")
-		redisClient.Close()
-		db.Close()
-	}
-
-	return &TestServer{Echo: e, Cleanup: cleanup}
 }
 
 // Request はHTTPリクエストを実行
@@ -117,8 +40,7 @@ func (s *TestServer) Request(method, path string, body interface{}, headers map[
 
 // TestE2E_HealthCheck はヘルスチェックをテスト
 func TestE2E_HealthCheck(t *testing.T) {
-	server := NewTestServer(t)
-	defer server.Cleanup()
+	server := getTestServer(t)
 
 	rec := server.Request("GET", "/health", nil, nil)
 
@@ -132,8 +54,7 @@ func TestE2E_HealthCheck(t *testing.T) {
 
 // TestE2E_CompleteReservationJourney は完全な予約ジャーニーをテスト
 func TestE2E_CompleteReservationJourney(t *testing.T) {
-	server := NewTestServer(t)
-	defer server.Cleanup()
+	server := getTestServer(t)
 
 	userID := "e2e-user-yamada"
 	var eventID, seatID, reservationID string
@@ -247,8 +168,7 @@ func TestE2E_CompleteReservationJourney(t *testing.T) {
 
 // TestE2E_ReservationConflict は予約競合をテスト
 func TestE2E_ReservationConflict(t *testing.T) {
-	server := NewTestServer(t)
-	defer server.Cleanup()
+	server := getTestServer(t)
 
 	var eventID, seatID string
 
@@ -302,8 +222,7 @@ func TestE2E_ReservationConflict(t *testing.T) {
 
 // TestE2E_CancelAndRebook はキャンセル後の再予約をテスト
 func TestE2E_CancelAndRebook(t *testing.T) {
-	server := NewTestServer(t)
-	defer server.Cleanup()
+	server := getTestServer(t)
 
 	var eventID, seatID, reservationID string
 
@@ -370,8 +289,7 @@ func TestE2E_CancelAndRebook(t *testing.T) {
 
 // TestE2E_IdempotencyKey は冪等性キーをテスト
 func TestE2E_IdempotencyKey(t *testing.T) {
-	server := NewTestServer(t)
-	defer server.Cleanup()
+	server := getTestServer(t)
 
 	var eventID, seatID string
 
@@ -431,8 +349,7 @@ func TestE2E_IdempotencyKey(t *testing.T) {
 
 // TestE2E_EventCRUD はイベントのCRUD操作をテスト
 func TestE2E_EventCRUD(t *testing.T) {
-	server := NewTestServer(t)
-	defer server.Cleanup()
+	server := getTestServer(t)
 
 	var eventID string
 
