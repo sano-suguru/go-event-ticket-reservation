@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/sanosuguru/go-event-ticket-reservation/internal/api"
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/api/handler"
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/api/middleware"
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/application"
@@ -61,27 +62,28 @@ func NewTestServer(t *testing.T) *TestServer {
 	healthHandler := handler.NewHealthHandler()
 
 	e := echo.New()
+	e.Validator = api.NewValidator()
 	middleware.SetupMiddleware(e)
 
 	e.GET("/health", healthHandler.Check)
 
-	api := e.Group("/api/v1")
-	api.POST("/events", eventHandler.Create)
-	api.GET("/events", eventHandler.List)
-	api.GET("/events/:id", eventHandler.GetByID)
-	api.PUT("/events/:id", eventHandler.Update)
-	api.DELETE("/events/:id", eventHandler.Delete)
+	v1 := e.Group("/api/v1")
+	v1.POST("/events", eventHandler.Create)
+	v1.GET("/events", eventHandler.List)
+	v1.GET("/events/:id", eventHandler.GetByID)
+	v1.PUT("/events/:id", eventHandler.Update)
+	v1.DELETE("/events/:id", eventHandler.Delete)
 
-	api.GET("/events/:event_id/seats", seatHandler.GetByEvent)
-	api.POST("/events/:event_id/seats", seatHandler.Create)
-	api.POST("/events/:event_id/seats/bulk", seatHandler.CreateBulk)
-	api.GET("/events/:event_id/seats/available/count", seatHandler.CountAvailable)
+	v1.GET("/events/:event_id/seats", seatHandler.GetByEvent)
+	v1.POST("/events/:event_id/seats", seatHandler.Create)
+	v1.POST("/events/:event_id/seats/bulk", seatHandler.CreateBulk)
+	v1.GET("/events/:event_id/seats/available/count", seatHandler.CountAvailable)
 
-	api.POST("/reservations", reservationHandler.Create)
-	api.GET("/reservations", reservationHandler.GetUserReservations)
-	api.GET("/reservations/:id", reservationHandler.GetByID)
-	api.POST("/reservations/:id/confirm", reservationHandler.Confirm)
-	api.POST("/reservations/:id/cancel", reservationHandler.Cancel)
+	v1.POST("/reservations", reservationHandler.Create)
+	v1.GET("/reservations", reservationHandler.GetUserReservations)
+	v1.GET("/reservations/:id", reservationHandler.GetByID)
+	v1.POST("/reservations/:id/confirm", reservationHandler.Confirm)
+	v1.POST("/reservations/:id/cancel", reservationHandler.Cancel)
 
 	cleanup := func() {
 		db.Exec("DELETE FROM reservation_seats")
