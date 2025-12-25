@@ -18,15 +18,12 @@ vendor/
 
 # IDE
 .idea/
-.vscode/
 *.swp
 *.swo
 *~
 
 # AI/MCP tools
-.claude/
-.mcp.json
-.serena/
+.claude/settings.local.json
 
 # OS
 .DS_Store
