@@ -83,10 +83,21 @@ jobs:
           go-version: "1.25.5"
           cache: true
 
+      - name: Cache golang-migrate
+        id: cache-migrate
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin/migrate
+          key: ${{ runner.os }}-migrate-v4.19.1
+
       - name: Install golang-migrate
+        if: steps.cache-migrate.outputs.cache-hit != 'true'
         run: |
           curl -fsSL https://github.com/golang-migrate/migrate/releases/download/v4.19.1/migrate.linux-amd64.tar.gz | tar xvz
-          sudo mv migrate /usr/local/bin/migrate
+          sudo mv migrate ~/go/bin/migrate
+
+      - name: Add migrate to PATH
+        run: echo "$HOME/go/bin" >> $GITHUB_PATH
 
       - name: Run migrations
         env:
