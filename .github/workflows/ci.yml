@@ -83,6 +83,17 @@ jobs:
           go-version: "1.25.5"
           cache: true
 
+      # Go Build Cache（race detector付きビルドを含む）
+      # actions/setup-go の cache: true は GOMODCACHE のみ対象
+      # GOCACHE を明示的にキャッシュすることでテストコンパイル時間を短縮
+      - name: Cache Go build
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/go-build
+          key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-build-
+
       - name: Cache golang-migrate
         id: cache-migrate
         uses: actions/cache@v4
