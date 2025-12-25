@@ -75,6 +75,8 @@ flowchart TB
 | キャッシュ / ロック | Redis 7 |
 | 監視 | Prometheus + 構造化ログ (zap) |
 | CI/CD | GitHub Actions |
+| セキュリティ | Trivy (コンテナ/FS スキャン) + Dependabot |
+| デプロイ | Railway |
 | API ドキュメント | OpenAPI / Swagger |
 
 ---
