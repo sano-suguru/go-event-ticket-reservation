@@ -23,6 +23,11 @@ vendor/
 *.swo
 *~
 
+# AI/MCP tools
+.claude/
+.mcp.json
+.serena/
+
 # OS
 .DS_Store
 Thumbs.db

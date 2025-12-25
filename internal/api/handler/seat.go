@@ -55,7 +55,7 @@ func (h *SeatHandler) GetByEvent(c echo.Context) error {
 		seats, err = h.service.GetSeatsByEvent(c.Request().Context(), eventID)
 	}
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 	resp := make([]SeatResponse, len(seats))
 	for i, s := range seats {
@@ -68,13 +68,16 @@ func (h *SeatHandler) Create(c echo.Context) error {
 	eventID := c.Param("event_id")
 	var req CreateSeatRequest
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "無効なリクエスト"})
+		return echo.NewHTTPError(http.StatusBadRequest, "無効なリクエスト")
+	}
+	if err := c.Validate(&req); err != nil {
+		return err
 	}
 	s, err := h.service.CreateSeat(c.Request().Context(), application.CreateSeatInput{
 		EventID: eventID, SeatNumber: req.SeatNumber, Price: req.Price,
 	})
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	return c.JSON(http.StatusCreated, toSeatResponse(s))
 }
@@ -83,13 +86,16 @@ func (h *SeatHandler) CreateBulk(c echo.Context) error {
 	eventID := c.Param("event_id")
 	var req CreateBulkSeatsRequest
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "無効なリクエスト"})
+		return echo.NewHTTPError(http.StatusBadRequest, "無効なリクエスト")
+	}
+	if err := c.Validate(&req); err != nil {
+		return err
 	}
 	seats, err := h.service.CreateBulkSeats(c.Request().Context(), application.CreateBulkSeatsInput{
 		EventID: eventID, Prefix: req.Prefix, Count: req.Count, Price: req.Price,
 	})
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	resp := make([]SeatResponse, len(seats))
 	for i, s := range seats {
@@ -102,7 +108,7 @@ func (h *SeatHandler) GetByID(c echo.Context) error {
 	id := c.Param("id")
 	s, err := h.service.GetSeat(c.Request().Context(), id)
 	if err != nil {
-		return c.JSON(http.StatusNotFound, map[string]string{"error": err.Error()})
+		return echo.NewHTTPError(http.StatusNotFound, err.Error())
 	}
 	return c.JSON(http.StatusOK, toSeatResponse(s))
 }
@@ -111,7 +117,7 @@ func (h *SeatHandler) CountAvailable(c echo.Context) error {
 	eventID := c.Param("event_id")
 	count, err := h.service.CountAvailableSeats(c.Request().Context(), eventID)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 	return c.JSON(http.StatusOK, map[string]int{"count": count})
 }

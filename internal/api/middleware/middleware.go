@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"time"
+
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
@@ -15,6 +17,11 @@ func SetupMiddleware(e *echo.Echo) {
 
 	// パニックリカバリー
 	e.Use(middleware.Recover())
+
+	// リクエストタイムアウト
+	e.Use(middleware.TimeoutWithConfig(middleware.TimeoutConfig{
+		Timeout: 30 * time.Second,
+	}))
 
 	// CORS
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{

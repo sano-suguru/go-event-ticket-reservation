@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/sanosuguru/go-event-ticket-reservation/internal/domain/event"
@@ -16,7 +15,7 @@ import (
 
 func TestHealthHandler_Check(t *testing.T) {
 	// Setup
-	e := echo.New()
+	e := NewTestEcho()
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
