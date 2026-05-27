@@ -3,7 +3,7 @@
 [![CI](https://github.com/sano-suguru/go-event-ticket-reservation/actions/workflows/ci.yml/badge.svg)](https://github.com/sano-suguru/go-event-ticket-reservation/actions/workflows/ci.yml)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/sano-suguru/go-event-ticket-reservation)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Demo](https://img.shields.io/badge/demo-Railway-blueviolet)](https://go-event-ticket-reservation-production.up.railway.app/swagger/index.html)
+
 
 大規模トラフィック（高負荷 / 高並行）・大量データでも二重予約ゼロを保証するイベントチケット予約システム
 
@@ -245,15 +245,15 @@ flowchart LR
 
 ## 🌐 デモ環境
 
-本番デプロイ済みの API にアクセスできます：
+> **現在停止中**: 本番デモは Railway の無料トライアル上でホストしていましたが、トライアル期間の終了に伴い停止しています（Railway には現在無料の常時稼働プランがありません）。お手数ですが、下記「クイックスタート」でローカル起動してお試しください。
+
+ローカル起動時のエンドポイント構成:
 
 | リソース | URL |
 |----------|-----|
-| **Swagger UI** | https://go-event-ticket-reservation-production.up.railway.app/swagger/index.html |
-| ヘルスチェック | https://go-event-ticket-reservation-production.up.railway.app/health |
-| Prometheus メトリクス | https://go-event-ticket-reservation-production.up.railway.app/metrics |
-
-> **Note**: Railway の無料プランではアイドル時にスリープするため、初回アクセス時に数秒かかる場合があります。
+| **Swagger UI** | http://localhost:8080/swagger/index.html |
+| ヘルスチェック | http://localhost:8080/health |
+| Prometheus メトリクス | http://localhost:8080/metrics |
 
 > **Note**: `/metrics` エンドポイントは意図的に認証なしで公開しています。Prometheus メトリクスには機密情報は含まれておらず、システムの透明性を優先しています。
 
@@ -273,7 +273,6 @@ make run
 
 # 4. Swagger UI
 open http://localhost:8080/swagger/index.html
-# または本番環境: https://go-event-ticket-reservation-production.up.railway.app/swagger/index.html
 ```
 
 ---
@@ -288,7 +287,7 @@ open http://localhost:8080/swagger/index.html
 | 予約確定 | POST | `/api/v1/reservations/:id/confirm` |
 | 予約キャンセル | POST | `/api/v1/reservations/:id/cancel` |
 
-詳細は [Swagger UI](https://go-event-ticket-reservation-production.up.railway.app/swagger/index.html) を参照。
+詳細は Swagger UI (`http://localhost:8080/swagger/index.html`) を参照。
 
 > **認証について**: デモ用のため `X-User-ID` ヘッダーで識別しています。本番利用時は JWT 等に置き換えてください。
 
